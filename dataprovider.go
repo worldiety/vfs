@@ -1,10 +1,29 @@
 //This package provides the API and basic tools for data providers, also known as virtual filesystem, in go.
 package vfs
 
-
+import (
+	"io"
+	"os"
+	"time"
+)
 
 // A Path must be unique in it's context and has the role of a composite key. It's segments are always separated using
 // a slash, even if they denote paths from windows.
+//
+// Example
+//
+// Valid example paths
+//
+//  * /my/path/may/denote/a/file/or/folder
+//  * /c/my/windows/folder
+//  * /
+//
+// Invalid example paths
+//  * missing/slash
+//  * /extra/slash/
+//  * \using\backslashes
+//  * /c:/using/punctuations
+//  * ../../using/relative/paths
 //
 // Design decisions
 //
@@ -30,11 +49,39 @@ package vfs
 //    GC pressure, we do not use a slice of strings but just a pure string providing helper methods.
 type Path string
 
-//TBD
-type Transaction interface {
-	Begin() (DataProvider, error)
-	Commit(DataProvider) error
-	Rollback(DataProvider) error
+// A Query is a special struct to allow efficient batch queries e.g. of remote directory listings. Such
+// scenarios cannot be modelled properly using a single os.Stat call.
+//
+// A query is very limited and only supports limited projection and filter capabilities.
+//
+type Query struct {
+	Fields       []string
+	MatchParents []Path
+	MatchPaths   []Path
+}
+
+// NewQuery allocates a new Query instance for a fluent API. An empty query must be supported and returns everything.
+func NewQuery() *Query {
+	return &Query{}
+}
+
+// Select limits the available fields for the DataProvider which may use these information to optimize it's performance.
+// All DataProviders must support an empty projection and must silently ignore unknown or unsupported fields.
+func (q *Query) Select(fields ...string) *Query {
+	q.Fields = fields
+	return q
+}
+
+// MatchParent returns only those resources which have an exact matching parent parent.
+func (q *Query) MatchParent(path Path) *Query {
+	q.MatchParents = append(q.MatchParents, path)
+	return q
+}
+
+// MatchPath returns only those resources which have an exact matching path.
+func (q *Query) MatchPath(path Path) *Query {
+	q.MatchPaths = append(q.MatchPaths, path)
+	return q
 }
 
 // The DataProvider interface is the core contract to provide access to hierarchical structures using a compound
@@ -55,19 +102,37 @@ type Transaction interface {
 //    their VFS contract through the Transaction interface.
 //
 type DataProvider interface {
-	//A generic stat call to read information about a path, potentially without allocations.
-	//Must be an instance of a Stat* struct, but each implementation may also provide custom things for any use case.
-	ReadStat(Path,interface{})error
+	// The query method is used to acquire meta data
+	Query(query *Query) (Cursor, error)
+
+	// Opens the given resource for reading. May optionally also implement os.Seeker
+	Read(path Path) (io.ReadCloser, error)
+
+	// Opens the given resource for writing.
+	Write(path Path) (io.WriteCloser, error)
 }
 
-type StatUnix struct{
 
+
+type AttributesReader interface {
+	Attributes(data interface{}) error
 }
 
-type StatWindows struct{
-
+// A Cursor currently only provides a ForEach logic, because this is what most of the use cases require.
+// We don't want that all implementations require a seekable cursor. Most use cases will require a list anyway.
+type Cursor interface {
+	// to support GC f
+	ForEach(func(reader AttributesReader) (next bool, err error)) error
+	io.Closer
 }
 
-type StatX struct{
 
+
+// A ResourceInfo represents the default meta data set which must be supported by all implementations Query method.
+// However each implementation may also support other types as well.
+type ResourceInfo struct {
+	Path    string      // The full qualified path of the resource
+	Size    int64       // length in bytes for regular files of the primary data stream; system-dependent for others
+	Mode    os.FileMode // file mode bits
+	ModTime time.Time   // modification time
 }
