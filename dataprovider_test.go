@@ -1,20 +1,117 @@
 package vfs
 
-func QueryExample_query(dp DataProvider) error {
-	cursor, err := dp.Query(NewQuery().Select().MatchPath(Path("/asd/")).MatchParent(Path("/any/other")))
-	if err != nil {
-		return err
-	}
-	defer cursor.Close()
-	//we can allocate our info object outside
+import "testing"
+
+func QueryExamples_query(dp DataProvider) error {
+	query := NewQuery().Select().MatchPath(Path("/asd/")).MatchParent(Path("/any/other"))
 	tmp := &ResourceInfo{}
-	err = cursor.ForEach(func(reader AttributesReader) (next bool, err error) {
-		err = reader.Attributes(tmp)
+	err := ForEach(dp, query, func(scanner AttributesScanner) (next bool, err error) {
+		err = scanner.Scan(tmp)
 		if err != nil {
 			return
 		}
 		next = true
 		return
 	})
+
 	return err
+}
+
+func ResultSetExamples() {
+
+}
+
+func TestEmptyPath(t *testing.T) {
+	cases := []string{"", "/"}
+	for _, str := range cases {
+		p := Path(str)
+		if p.NameCount() != 0 {
+			t.Fatal("expected 0 but got", p.NameCount())
+		}
+
+		if len(p.Names()) != 0 {
+			t.Fatal("expected 0 but got", len(p.Names()))
+		}
+
+		if p.Parent().NameCount() != 0 {
+			t.Fatal("expected 0 but got", p.Parent().NameCount())
+		}
+
+		if p.String() != "/" {
+			t.Fatal("expected / but got", p.String())
+		}
+	}
+}
+
+func Test1Path(t *testing.T) {
+	cases := []string{"a", "/a", "a/", "/a/"}
+	for _, str := range cases {
+		p := Path(str)
+		if p.NameCount() != 1 {
+			t.Fatal("expected 1 but got", p.NameCount(), " => "+str)
+		}
+
+		if len(p.Names()) != 1 {
+			t.Fatal("expected 1 but got", len(p.Names()), " => "+str)
+		}
+
+		if p.NameAt(0) != "a" {
+			t.Fatal("expected a but got", p.NameAt(0))
+		}
+
+		if p.Parent().NameCount() != 0 {
+			t.Fatal("expected 0 but got", p.Parent().NameCount())
+		}
+
+		if p.String() != "/a" {
+			t.Fatal("expected /a but got", p.String())
+		}
+	}
+}
+
+func Test2Path(t *testing.T) {
+	cases := []string{"a/b", "/a/b", "a/b", "/a/b/"}
+	for _, str := range cases {
+		p := Path(str)
+		if p.NameCount() != 2 {
+			t.Fatal("expected 1 but got", p.NameCount(), " => "+str)
+		}
+
+		if len(p.Names()) != 2 {
+			t.Fatal("expected 1 but got", len(p.Names()), " => "+str)
+		}
+
+		if p.NameAt(0) != "a" {
+			t.Fatal("expected a but got", p.NameAt(0))
+		}
+
+		if p.NameAt(1) != "b" {
+			t.Fatal("expected b but got", p.NameAt(1))
+		}
+
+		if p.Parent().NameCount() != 1 {
+			t.Fatal("expected 1 but got", p.Parent().NameCount())
+		}
+
+		if p.String() != "/a/b" {
+			t.Fatal("expected /a/b but got", p.String())
+		}
+	}
+}
+
+func TestModPath(t *testing.T) {
+	p := ConcatePaths("a/b/", "/c")
+	if p.String() != "/a/b/c" {
+		t.Fatal("expected /a/b/c but got", p)
+	}
+
+	p = p.Child("d")
+	if p.String() != "/a/b/c/d" {
+		t.Fatal("expected /a/b/c/d but got", p)
+	}
+
+	p = p.TrimPrefix(Path("a/b/c"))
+	if p.String() != "/d" {
+		t.Fatal("expected /d but got", p)
+	}
 }
