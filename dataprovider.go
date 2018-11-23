@@ -5,7 +5,6 @@ import (
 	"io"
 	"os"
 	"strings"
-	"time"
 )
 
 // A Path must be unique in it's context and has the role of a composite key. It's segments are always separated using
@@ -241,8 +240,25 @@ type DataProvider interface {
 	// Deletes a path entry and all contained children. It is not considered an error to delete a non-existing resource.
 	Delete(path Path) error
 
+	DeleteBatch(paths...Path)error
 	// Updates the attributes in a batch, if supported, otherwise returns an OperationNotSupportedError
-	SetAttributes(attribs ...*Attributes) error
+	SetBatchAttributes(attribs ...*Attributes) error
+
+	//==============
+
+
+	// Simplified contract, optimizations needs to take place at the ProviderLevel?
+	ReadDir(path Path) (ResourceList, error)
+}
+
+type ResourceList interface {
+	//? bad, not pageable, needs to wait until e.g. dropbox completed transfer before starting, also no on-demand queries
+	Get(idx int) (ResourceInfo,error)
+
+	//or just the forEach closure instead of next?
+	ForEach(func(scanner AttributesScanner)error)error
+	Scan(idx int, dest interface{}) error
+	Size() int64
 }
 
 type Attributes struct {
@@ -265,6 +281,7 @@ type ResultSet interface {
 	// It returns true on success, or false if there is no next result row or an error happened while preparing it.
 	// Err should be consulted to distinguish between the two cases.
 	//Every call to Scan, even the first one, must be preceded by a call to Next.
+	// This is pageable and works with an unlimited amount of entries
 	Next() bool
 
 	// Estimated amount of entries in the ResultSet
@@ -274,11 +291,11 @@ type ResultSet interface {
 	io.Closer
 }
 
-// A ResourceInfo represents the default meta data set which must be supported by all implementations Query method.
-// However each implementation may also support other types as well.
+// A ResourceInfo represents the default meta data set which must be supported by all implementations.
+// However each implementation may also support other metadata as well.
 type ResourceInfo struct {
-	Path    string      // The full qualified path of the resource
-	Size    int64       // length in bytes for regular files of the primary data stream; system-dependent for others
-	Mode    os.FileMode // file mode bits
-	ModTime time.Time   // modification time
+	Name string      // The full qualified path of the resource
+	Size int64       // length in bytes for regular files of the primary data stream; system-dependent for others
+	Mode os.FileMode // file mode bits
+	ModTime int64    // modification time in milliseconds since epoch
 }
