@@ -10,9 +10,9 @@ type RandomAccessor interface {
 	io.Closer
 }
 
-// A RandomAccessProvider is a DataProvider which allows efficient in-place modification and delta updates for a
-// Resource.
-type RandomAccessProvider interface {
+// A RandomAccessDataProvider is an optional DataProvider which allows efficient in-place modification and delta
+// updates for a Resource.
+type RandomAccessDataProvider interface {
 	// Opens the resource without truncation. Initial position is at offset 0. If the resource can be opened
 	// concurrently or if the modifications are immediately visible is implementation specific.
 	Modify(path Path) (RandomAccessor, error)

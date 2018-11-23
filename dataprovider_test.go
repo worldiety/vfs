@@ -2,24 +2,7 @@ package vfs
 
 import "testing"
 
-func QueryExamples_query(dp DataProvider) error {
-	query := NewQuery().Select().MatchPath(Path("/asd/")).MatchParent(Path("/any/other"))
-	tmp := &ResourceInfo{}
-	err := ForEach(dp, query, func(scanner AttributesScanner) (next bool, err error) {
-		err = scanner.Scan(tmp)
-		if err != nil {
-			return
-		}
-		next = true
-		return
-	})
 
-	return err
-}
-
-func ResultSetExamples() {
-
-}
 
 func TestEmptyPath(t *testing.T) {
 	cases := []string{"", "/"}
