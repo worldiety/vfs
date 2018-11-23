@@ -20,8 +20,10 @@ import (
 //    with both capabilities are edge cases. Mostly there will be implementations which provides each combination due to
 //    their permission handling.
 //
-//  * Most implementations do not provide a transactional contract, however abstraction which do so, should only provide
-//    their VFS contract through the Transaction interface.
+//  * Most implementations do not provide a transactional contract, which is represented through the optional
+//    TransactionableDataProvider.
+//
+//  * It is not specified, if a DataProvider is thread safe and entirely implementation specific.
 //
 type DataProvider interface {
 	// Opens the given resource for reading. May optionally also implement os.Seeker
