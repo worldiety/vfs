@@ -51,7 +51,8 @@ type DataProvider interface {
 // The Scanner contract is used to populate a pointer to a struct to get specific meta data out of an
 // entry.
 type Scanner interface {
-	// Scan supports at least data into *ResourceInfo
+	// Scan supports at least data into *ResourceInfo. Especially it is not guaranteed to fill or map into unknown
+	// structs even if the field structure is identical.
 	Scan(dest interface{}) error
 }
 
@@ -59,7 +60,8 @@ type Scanner interface {
 // E.g. the entire query may be even delayed until the first ForEach query, so that the scanner takes the given
 // type and optimizes its remote query (e.g. by including or excluding required fields).
 type DirEntList interface {
-	// Loops over the result set and is invoked for each entry.
+	// Loops over the result set and is invoked for each entry. The loop is cancelled as soon as the each closure
+	// returns a non-nil error, which is simply returned.
 	ForEach(each func(scanner Scanner) error) error
 
 	// Estimated amount of entries. Is -1 if unknown and you definitely have to use ForEach to collect the result.

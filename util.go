@@ -5,7 +5,7 @@ import (
 	"log"
 )
 
-// tries to close and prints silently the closer
+// tries to close and prints silently the closer in case of an error
 func silentClose(closer io.Closer) {
 	err := closer.Close()
 	if err != nil {
@@ -13,8 +13,8 @@ func silentClose(closer io.Closer) {
 	}
 }
 
-// A utility method to simply list a Query Result as ResourceInfo, which is supported by all DataProviders
-func ListOf(provider DataProvider, path Path) ([]*ResourceInfo, error) {
+// A utility method to simply list a directory listing as ResourceInfo, which is supported by all DataProviders
+func ReadDir(provider DataProvider, path Path) ([]*ResourceInfo, error) {
 	list := make([]*ResourceInfo, 0)
 	res, err := provider.ReadDir(path)
 	if err != nil {
@@ -35,3 +35,5 @@ func ListOf(provider DataProvider, path Path) ([]*ResourceInfo, error) {
 	}
 	return list, nil
 }
+
+

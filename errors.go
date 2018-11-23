@@ -39,3 +39,11 @@ type UnsupportedAttributes struct {
 func (e *UnsupportedAttributes) Error() string {
 	return fmt.Sprintf("%v", e.Data)
 }
+
+//
+type Cancelled struct {
+}
+
+func (e *Cancelled) Error() string {
+	return "cancelled"
+}
