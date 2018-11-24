@@ -38,11 +38,15 @@ type DataProvider interface {
 	// Reads Attributes. Every implementation must support ResourceInfo
 	ReadAttrs(path Path, dest interface{}) error
 
-	// Writes Attributes. This is an optional implementation and may simply return OperationNotSupportedError.
+	// Writes Attributes. This is an optional implementation and may simply return UnsupportedOperationError.
 	WriteAttrs(path Path, src interface{}) error
 
 	// Reads the contents of a directory.
 	ReadDir(path Path) (DirEntList, error)
+
+	// Tries to create the given path hierarchy. If path already denotes a directory nothing happens. If any path
+	// segment already refers a file, an error must be returned.
+	MkDirs(path Path) error
 
 	// Please close when Done
 	io.Closer

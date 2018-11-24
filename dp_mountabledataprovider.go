@@ -54,6 +54,14 @@ type MountableDataProvider struct {
 	root *virtualDir
 }
 
+func (p *MountableDataProvider) MkDirs(path Path) error {
+	_, providerPath, dp := p.Resolve(path)
+	if dp != nil {
+		return dp.MkDirs(providerPath)
+	}
+	return &MountPointNotFoundError{}
+}
+
 // You cannot close a MountableDataProvider, so this does nothing.
 func (p *MountableDataProvider) Close() error {
 	return nil
@@ -144,7 +152,7 @@ func (p *MountableDataProvider) ReadDir(path Path) (DirEntList, error) {
 		if vdir, ok := child.data.(*virtualDir); ok {
 			parent = vdir
 		} else {
-			return nil, &ResourceNotFoundError{path}
+			return nil, &ResourceNotFoundError{Path: path}
 		}
 	}
 	if vdir, ok := child.data.(*virtualDir); ok {
@@ -182,7 +190,7 @@ func (p *MountableDataProvider) Delete(path Path) error {
 	for _, name := range names[0 : len(names)-1] {
 		child := parent.ChildByName(name)
 		if child == nil {
-			return &ResourceNotFoundError{path}
+			return &ResourceNotFoundError{Path: path}
 		}
 	}
 	parent.RemoveChild(names[len(names)-1])
@@ -224,6 +232,6 @@ func (s *entScanner) Scan(dest interface{}) error {
 		info.Name = s.entry.name
 		return nil
 	} else {
-		return &UnsupportedAttributes{dest}
+		return &UnsupportedAttributesError{Data: dest}
 	}
 }

@@ -9,7 +9,7 @@ type BatchDataProvider interface {
 	// Reads all given attributes in a batch. Every implementation must support ResourceInfo
 	BatchReadAttrs(attribs ...Attributes) error
 
-	// Writes all given attributes. This is an optional implementation and may simply return OperationNotSupportedError
+	// Writes all given attributes. This is an optional implementation and may simply return UnsupportedOperationError
 	BatchWriteAttrs(attribs ...Attributes) error
 
 	DataProvider
