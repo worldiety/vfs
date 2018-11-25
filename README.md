@@ -1,4 +1,4 @@
-# vfs
+# vfs [![Go Report Card](https://goreportcard.com/badge/github.com/worldiety/vfs)](https://goreportcard.com/report/github.com/worldiety/vfs)
 Another virtual filesystem abstraction for go.
 
 Actually I've used and written already quite a few abstraction layers and
