@@ -1,0 +1,8 @@
+language: go
+go_import_path: github.com/worldiety/vfs
+go:
+- 1.11.x
+- tip
+
+script:
+- go test -race -v ./...
