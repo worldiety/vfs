@@ -56,7 +56,7 @@ func (p Path) EndsWith(suffix Path) bool {
 	return strings.HasSuffix(string(p), string(suffix))
 }
 
-// Splits the path by / and returns all segments as a simple string array.
+// Names splits the path by / and returns all segments as a simple string array.
 func (p Path) Names() []string {
 	tmp := strings.Split(string(p), "/")
 	cleaned := make([]string, len(tmp))
@@ -71,17 +71,17 @@ func (p Path) Names() []string {
 	return cleaned[0:idx]
 }
 
-// Returns how many names are included in this path.
+// NameCount returns how many names are included in this path.
 func (p Path) NameCount() int {
 	return len(p.Names())
 }
 
-// Returns the name at the given index.
+// NameAt returns the name at the given index.
 func (p Path) NameAt(idx int) string {
 	return p.Names()[idx]
 }
 
-// Returns the last element in this path or the empty string if this path is empty.
+// Name returns the last element in this path or the empty string if this path is empty.
 func (p Path) Name() string {
 	tmp := p.Names()
 	if len(tmp) > 0 {
@@ -90,7 +90,7 @@ func (p Path) Name() string {
 	return ""
 }
 
-// Returns the parent path of this path.
+// Parent returns the parent path of this path.
 func (p Path) Parent() Path {
 	tmp := p.Names()
 	if len(tmp) > 0 {
@@ -104,7 +104,7 @@ func (p Path) String() string {
 	return "/" + strings.Join(p.Names(), "/")
 }
 
-// Returns a new Path append the child name
+// Child returns a new Path with name appended as a child
 func (p Path) Child(name string) Path {
 	if strings.HasPrefix(name, "/") {
 		return Path(p.String() + name)
@@ -112,14 +112,14 @@ func (p Path) Child(name string) Path {
 	return Path(p.String() + "/" + name)
 }
 
-// Returns a path without the prefix
+// TrimPrefix returns a path without the prefix
 func (p Path) TrimPrefix(prefix Path) Path {
 	tmp := "/" + strings.TrimPrefix(p.String(), prefix.String())
 	return Path(tmp)
 }
 
-// Concates all paths together
-func ConcatePaths(paths ...Path) Path {
+// ConcatPaths merges all paths together
+func ConcatPaths(paths ...Path) Path {
 	tmp := make([]string, 0)
 	for _, path := range paths {
 		for _, name := range path.Names() {

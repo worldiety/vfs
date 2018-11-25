@@ -1,6 +1,6 @@
 package vfs
 
-// An optional DataProvider contract which offers the possibility of more efficient batch operations.
+// BatchDataProvider is an optional contract which offers the possibility of more efficient batch operations.
 type BatchDataProvider interface {
 	// Deletes all given path entries and all contained children. It is not considered an error to delete a
 	// non-existing resource.

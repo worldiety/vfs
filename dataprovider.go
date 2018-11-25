@@ -1,4 +1,4 @@
-//This package provides the API and basic tools for data providers, also known as virtual filesystem, in go.
+//Package vfs provides the API and basic tools for data providers, also known as virtual filesystems.
 package vfs
 
 import (

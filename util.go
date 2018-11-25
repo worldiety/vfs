@@ -13,7 +13,7 @@ func silentClose(closer io.Closer) {
 	}
 }
 
-// A utility method to simply list a directory listing as ResourceInfo, which is supported by all DataProviders
+// ReadDir is utility method to simply list a directory listing as ResourceInfo, which is supported by all DataProviders
 func ReadDir(provider DataProvider, path Path) ([]*ResourceInfo, error) {
 	list := make([]*ResourceInfo, 0)
 	res, err := provider.ReadDir(path)
@@ -35,5 +35,3 @@ func ReadDir(provider DataProvider, path Path) ([]*ResourceInfo, error) {
 	}
 	return list, nil
 }
-
-

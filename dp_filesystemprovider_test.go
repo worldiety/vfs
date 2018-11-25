@@ -72,6 +72,9 @@ func TestFiles(t *testing.T) {
 				if n != len(tf.data) {
 					t.Fatal("expected to write ", len(tf.data), "but got", n)
 				}
+				if err != nil {
+					t.Fatal("unexpected error", err)
+				}
 				err = writer.Close()
 				if err != nil {
 					t.Fatal("unexpected error", err)

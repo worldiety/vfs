@@ -2,8 +2,6 @@ package vfs
 
 import "testing"
 
-
-
 func TestEmptyPath(t *testing.T) {
 	cases := []string{"", "/"}
 	for _, str := range cases {
@@ -83,7 +81,7 @@ func Test2Path(t *testing.T) {
 }
 
 func TestModPath(t *testing.T) {
-	p := ConcatePaths("a/b/", "/c")
+	p := ConcatPaths("a/b/", "/c")
 	if p.String() != "/a/b/c" {
 		t.Fatal("expected /a/b/c but got", p)
 	}

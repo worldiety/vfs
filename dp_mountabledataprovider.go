@@ -54,6 +54,7 @@ type MountableDataProvider struct {
 	root *virtualDir
 }
 
+// MkDirs details: see DataProvider#MkDirs
 func (p *MountableDataProvider) MkDirs(path Path) error {
 	_, providerPath, dp := p.Resolve(path)
 	if dp != nil {
@@ -62,7 +63,7 @@ func (p *MountableDataProvider) MkDirs(path Path) error {
 	return &MountPointNotFoundError{}
 }
 
-// You cannot close a MountableDataProvider, so this does nothing.
+// Close does nothing.
 func (p *MountableDataProvider) Close() error {
 	return nil
 }
@@ -74,7 +75,7 @@ func (p *MountableDataProvider) getRoot() *virtualDir {
 	return p.root
 }
 
-// Mounts the given provider into the leaf of the path. Important: you cannot mount one provider into another.
+// Mount includes the given provider into the leaf of the path. Important: you cannot mount one provider into another.
 func (p *MountableDataProvider) Mount(mountPoint Path, provider DataProvider) {
 	parent := p.getRoot()
 	names := mountPoint.Names()
@@ -121,6 +122,7 @@ func (p *MountableDataProvider) Resolve(path Path) (mountPoint Path, providerPat
 	return "", "", nil
 }
 
+// ReadAttrs details: see DataProvider#ReadAttrs
 func (p *MountableDataProvider) ReadAttrs(path Path, dest interface{}) error {
 	_, providerPath, dp := p.Resolve(path)
 	if dp != nil {
@@ -129,6 +131,7 @@ func (p *MountableDataProvider) ReadAttrs(path Path, dest interface{}) error {
 	return &MountPointNotFoundError{}
 }
 
+// WriteAttrs details: see DataProvider#WriteAttrs
 func (p *MountableDataProvider) WriteAttrs(path Path, src interface{}) error {
 	_, providerPath, dp := p.Resolve(path)
 	if dp != nil {
@@ -137,7 +140,7 @@ func (p *MountableDataProvider) WriteAttrs(path Path, src interface{}) error {
 	return &MountPointNotFoundError{}
 }
 
-// Either dispatches as expected or the virtual directories
+// ReadDir either dispatches as expected or the virtual directories. See also DataProvider#ReadDir
 func (p *MountableDataProvider) ReadDir(path Path) (DirEntList, error) {
 	_, providerPath, dp := p.Resolve(path)
 	if dp != nil {
@@ -157,9 +160,9 @@ func (p *MountableDataProvider) ReadDir(path Path) (DirEntList, error) {
 	}
 	if vdir, ok := child.data.(*virtualDir); ok {
 		return &virtualDirEntList{vdir}, nil
-	} else {
-		panic("implementation failure")
 	}
+	panic("implementation failure")
+
 }
 
 func (p *MountableDataProvider) Read(path Path) (io.ReadCloser, error) {
@@ -178,7 +181,7 @@ func (p *MountableDataProvider) Write(path Path) (io.WriteCloser, error) {
 	return nil, &MountPointNotFoundError{}
 }
 
-// Dispatches as expected or removes a mount point
+// Delete dispatches as expected or removes a mount point. See DataProvider#Delete
 func (p *MountableDataProvider) Delete(path Path) error {
 	_, providerPath, dp := p.Resolve(path)
 	if dp != nil {
@@ -231,7 +234,7 @@ func (s *entScanner) Scan(dest interface{}) error {
 		info.Mode = os.ModeDir
 		info.Name = s.entry.name
 		return nil
-	} else {
-		return &UnsupportedAttributesError{Data: dest}
 	}
+	return &UnsupportedAttributesError{Data: dest}
+
 }

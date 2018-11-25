@@ -2,7 +2,7 @@ package vfs
 
 import "io"
 
-// ReadWriteSeeker is the interface that groups the basic Read, Write, Seek and Close methods.
+// RandomAccessor is the interface that groups the basic Read, Write, Seek and Close methods.
 type RandomAccessor interface {
 	io.Reader
 	io.Writer
