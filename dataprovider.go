@@ -30,6 +30,7 @@ type DataProvider interface {
 	Read(path Path) (io.ReadCloser, error)
 
 	// Opens the given resource for writing. Removes and recreates the file. May optionally also implement os.Seeker.
+	// If elements of the path do not exist, they are created implicitly.
 	Write(path Path) (io.WriteCloser, error)
 
 	// Deletes a path entry and all contained children. It is not considered an error to delete a non-existing resource.

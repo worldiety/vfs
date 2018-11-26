@@ -41,7 +41,21 @@ func (p *FilesystemDataProvider) Read(path Path) (io.ReadCloser, error) {
 
 // Write details: see DataProvider#Write
 func (p *FilesystemDataProvider) Write(path Path) (io.WriteCloser, error) {
-	return os.Create(p.Resolve(path))
+	file, err := os.Create(p.Resolve(path))
+	if _, ok := err.(*os.PathError); ok {
+		//try to recreate parent folder
+		err2 := p.MkDirs(path.Parent())
+		if err2 != nil {
+			//suppress err2 intentionally and return the original failure
+			return nil, err
+		}
+		// mkdir is fine, retry again
+		file, err = os.Create(p.Resolve(path))
+		if err != nil {
+			return nil, err
+		}
+	}
+	return file, nil
 }
 
 // Delete details: see DataProvider#Delete

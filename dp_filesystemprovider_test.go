@@ -1,8 +1,10 @@
 package vfs
 
 import (
+	"fmt"
 	"io/ioutil"
 	"os"
+	"reflect"
 	"testing"
 )
 
@@ -38,7 +40,22 @@ func TestEmpty(t *testing.T) {
 	}
 }
 
+func TestCTS(t *testing.T) {
+	path := createTmpDir(t)
+	fs := &FilesystemDataProvider{path.String()}
+
+	cts := &CTS{}
+	result := cts.Run(fs)
+	fmt.Printf("\n\n%v\n\n", result.String())
+	for _, check := range result {
+		if check.Result != nil {
+			t.Fatal(check.Check.Name, "failed:", reflect.TypeOf(check.Result), ":", check.Result)
+		}
+	}
+
+}
 func TestFiles(t *testing.T) {
+
 	fileSets := [][]*testFile{
 		{{"file0.bin", []byte{1}}},
 		{{"file0.bin", []byte{1}}, {"file1.bin", []byte{1, 2}}},
