@@ -49,6 +49,7 @@ func (t *CTS) All() {
 	t.checks = []*Check{
 		CheckIsEmpty,
 		CheckCanWrite0,
+		CheckReadAny,
 	}
 }
 
@@ -96,9 +97,10 @@ var CheckIsEmpty = &Check{
 		}
 		return fmt.Errorf("DataProvider is not empty and cannot clear it")
 	},
-	Name:        "Empty DataProvider",
+	Name:        "Empty",
 	Description: "Checks the corner case of an empty DataProvider",
 }
+
 var CheckCanWrite0 = &Check{
 	Test: func(dp DataProvider) error {
 		paths := []Path{"", "/", "/canWrite0", "/canWrite0/subfolder", "canWrite0_1/subfolder1/subfolder2"}
@@ -129,6 +131,34 @@ var CheckCanWrite0 = &Check{
 
 		return nil
 	},
-	Name:        "A simple write test",
+	Name:        "Write any",
 	Description: "Write some simple files with various lengths in various paths",
+}
+
+var CheckReadAny = &Check{
+	Test: func(dp DataProvider) error {
+		list, err := ReadDirs(dp, "")
+		if err != nil {
+			return err
+		}
+		if len(list) == 0 {
+			return fmt.Errorf("expected at least 1 file")
+		}
+
+		for _, entry := range list {
+			if entry.Resource.Mode.IsDir() {
+				continue
+			}
+			tmp, err := ReadFully(dp, entry.Path)
+			if err != nil {
+				return err
+			}
+			if len(tmp) != int(entry.Resource.Size) {
+				return fmt.Errorf("expected same size of %v: expected %v bytes but got %v", entry.Path, entry.Resource.Size, len(tmp))
+			}
+		}
+		return nil
+	},
+	Name:        "Read any",
+	Description: "Asserts that nothing is empty and everything can be read",
 }

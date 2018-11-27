@@ -54,6 +54,20 @@ type MountableDataProvider struct {
 	root *virtualDir
 }
 
+// Rename details: see DataProvider#Rename
+func (p *MountableDataProvider) Rename(oldPath Path, newPath Path) error {
+	mp0, providerPath0, dp0 := p.Resolve(oldPath)
+	mp1, _, _ := p.Resolve(newPath)
+	if mp0 != mp1 {
+		return &UnsupportedOperationError{Message: "cannot rename across mount points: " + mp0.String() + " -> " + mp1.String()}
+	}
+
+	if dp0 != nil {
+		return dp0.MkDirs(providerPath0)
+	}
+	return &MountPointNotFoundError{}
+}
+
 // MkDirs details: see DataProvider#MkDirs
 func (p *MountableDataProvider) MkDirs(path Path) error {
 	_, providerPath, dp := p.Resolve(path)

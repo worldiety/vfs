@@ -42,7 +42,7 @@ func TestEmpty(t *testing.T) {
 
 func TestCTS(t *testing.T) {
 	path := createTmpDir(t)
-	fs := &FilesystemDataProvider{path.String()}
+	fs := &FilesystemDataProvider{Prefix: path.String()}
 
 	cts := &CTS{}
 	cts.All()
@@ -77,7 +77,7 @@ func TestFiles(t *testing.T) {
 			case testModePrefix:
 				absPath := createTmpDir(t)
 				path = ""
-				fs = &FilesystemDataProvider{absPath.String()}
+				fs = &FilesystemDataProvider{Prefix: absPath.String()}
 			}
 
 			for _, tf := range fileSet {

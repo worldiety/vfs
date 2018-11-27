@@ -25,5 +25,6 @@ incompatible structrual API changes anymore. However the CTS profiles will be up
 
 | CTS Check     | Result        |
 | ------------- | ------------- |
-| Empty DataProvider|:white_check_mark: |
-| A simple write test|:white_check_mark: |
+| Empty|:white_check_mark: |
+| Write any|:white_check_mark: |
+| Read any|:white_check_mark: |

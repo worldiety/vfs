@@ -119,6 +119,26 @@ func (p Path) TrimPrefix(prefix Path) Path {
 	return Path(tmp)
 }
 
+// Normalize removes any . and .. and returns a Path without those elements.
+func (p Path) Normalize() Path {
+	names := p.Names()
+	tmp := make([]string, len(names))[0:0]
+	for _, name := range names {
+		if name == "." {
+			continue
+		}
+		if name == ".." {
+			// walk up -> remove last segment
+			if len(tmp) > 0 {
+				tmp = tmp[:len(tmp)-1]
+			}
+			continue
+		}
+		tmp = append(tmp, name)
+	}
+	return Path("/" + strings.Join(p.Names(), "/"))
+}
+
 // ConcatPaths merges all paths together
 func ConcatPaths(paths ...Path) Path {
 	tmp := make([]string, 0)

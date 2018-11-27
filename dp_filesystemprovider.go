@@ -13,11 +13,12 @@ var _ DataProvider = (*FilesystemDataProvider)(nil)
 // A FilesystemDataProvider just works with the local filesystem and optionally supports a local filename prefix, e.g.
 // to just provide a subset instead of the entire root. See also Resolve.
 type FilesystemDataProvider struct {
+	// The Prefix is always added to any given path, so you can create artificial roots.
 	Prefix string
 }
 
 // Resolve creates a platform specific filename from the given invariant path by adding the Prefix and using
-// the platform specific name separator
+// the platform specific name separator. If AllowRelativePaths is false (default), .. will be silently ignored.
 func (p *FilesystemDataProvider) Resolve(path Path) string {
 	if len(p.Prefix) == 0 {
 		if runtime.GOOS == "windows" {
@@ -26,7 +27,29 @@ func (p *FilesystemDataProvider) Resolve(path Path) string {
 		return path.String()
 
 	}
+	// security feature: we normalize our path, before adding the prefix to avoid breaking out of our root
+	path = path.Normalize()
 	return filepath.Join(p.Prefix, filepath.Join(path.Names()...))
+}
+
+// Rename details: see DataProvider#Rename
+func (p *FilesystemDataProvider) Rename(oldPath Path, newPath Path) error {
+	err := os.Rename(p.Resolve(oldPath), p.Resolve(newPath))
+	if err != nil {
+		//perhaps the backend does not support the rename if target already exists
+		err2 := p.Delete(newPath)
+		if err2 != nil {
+			//intentionally ignore err2 and return original failure
+			return err
+		}
+		//retry again
+		err3 := os.Rename(p.Resolve(oldPath), p.Resolve(newPath))
+		if err3 != nil {
+			//intentionally ignore err3 and return original failure
+			return err
+		}
+	}
+	return nil
 }
 
 // MkDirs details: see DataProvider#MkDirs

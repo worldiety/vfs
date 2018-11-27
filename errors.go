@@ -2,15 +2,6 @@ package vfs
 
 import "fmt"
 
-// A Wrapper is an error implementation
-// wrapping context around another error.
-// TODO remove in Go2 https://go.googlesource.com/proposal/+/master/design/go2draft-error-inspection.md
-type Wrapper interface {
-	// Unwrap returns the next error in the error chain.
-	// If there is no next error, Unwrap returns nil.
-	Unwrap() error
-}
-
 // A MountPointNotFoundError is only used by the MountableDataProvider to indicate that the given path cannot be
 // associated with a mounted DataProvider. Check your prefix.
 type MountPointNotFoundError struct {
@@ -85,5 +76,19 @@ func (e *CancellationError) Error() string {
 
 // Unwrap returns nil or the cause.
 func (e *CancellationError) Unwrap() error {
+	return e.Cause
+}
+
+// PermissionDeniedError is returned if something is not allowed, either by some configuration or the backend.
+type PermissionDeniedError struct {
+	Cause error
+}
+
+func (e *PermissionDeniedError) Error() string {
+	return "cancelled"
+}
+
+// Unwrap returns nil or the cause.
+func (e *PermissionDeniedError) Unwrap() error {
 	return e.Cause
 }

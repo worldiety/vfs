@@ -27,7 +27,8 @@ import (
 //    implementation should be as thread safe as possible, similar to the POSIX filesystem specification.
 //
 type DataProvider interface {
-	// Opens the given resource for reading. May optionally also implement os.Seeker
+	// Opens the given resource for reading. May optionally also implement os.Seeker. If called on a directory
+	// UnsupportedOperationError is returned.
 	Read(path Path) (io.ReadCloser, error)
 
 	// Opens the given resource for writing. Removes and recreates the file. May optionally also implement os.Seeker.
@@ -49,6 +50,10 @@ type DataProvider interface {
 	// Tries to create the given path hierarchy. If path already denotes a directory nothing happens. If any path
 	// segment already refers a file, an error must be returned.
 	MkDirs(path Path) error
+
+	// Rename moves a file from the old to the new path. If oldPath does not exist, ResourceNotFoundError is returned.
+	// If newPath exists, it will be replaced.
+	Rename(oldPath Path, newPath Path) error
 
 	// Please close when Done
 	io.Closer
