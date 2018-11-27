@@ -23,7 +23,8 @@ import (
 //  * Most implementations do not provide a transactional contract, which is represented through the optional
 //    TransactionableDataProvider.
 //
-//  * It is not specified, if a DataProvider is thread safe and entirely implementation specific.
+//  * It is not specified, if a DataProvider is thread safe. However every
+//    implementation should be as thread safe as possible, similar to the POSIX filesystem specification.
 //
 type DataProvider interface {
 	// Opens the given resource for reading. May optionally also implement os.Seeker

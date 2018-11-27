@@ -11,8 +11,8 @@ import "strings"
 //
 //  * /my/path/may/denote/a/file/or/folder
 //  * c:/my/windows/folder
-//  * https://mydomain.com:8080/myresource
-//  * https://mydomain.com:8080/myresource?size=720p
+//  * mydomain.com/myresource
+//  * mydomain.com:8080/myresource?size=720p#anchor
 //  * c:/my/ntfs/file:alternate-data-stream
 //
 // Invalid example paths
@@ -21,6 +21,7 @@ import "strings"
 //  * \using\backslashes
 //  * /c///using/slashes without content
 //  * ../../using/relative/paths
+//  * https://mydomain.com:8080/myresource
 //
 // Design decisions
 //

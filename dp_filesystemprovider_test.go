@@ -45,6 +45,7 @@ func TestCTS(t *testing.T) {
 	fs := &FilesystemDataProvider{path.String()}
 
 	cts := &CTS{}
+	cts.All()
 	result := cts.Run(fs)
 	fmt.Printf("\n\n%v\n\n", result.String())
 	for _, check := range result {

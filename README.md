@@ -15,7 +15,7 @@ we may reject it, even if it is a perfect solution in a very specific scenario.
 
 # Status
 This library is still in alpha and it's API has not been stabilized yet. As soon as this happens, there will be no
-incompatible API changes anymore. However the CTS profiles will be updated and refined over time.
+incompatible structrual API changes anymore. However the CTS profiles will be updated and refined over time.
 
 # Available implementations
 

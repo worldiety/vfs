@@ -45,16 +45,15 @@ type CTS struct {
 	checks []*Check
 }
 
-func (t *CTS) setup() {
+func (t *CTS) All() {
 	t.checks = []*Check{
-		isEmpty,
-		canWrite0,
+		CheckIsEmpty,
+		CheckCanWrite0,
 	}
 }
 
 func (t *CTS) Run(dp DataProvider) CTSResult {
 	res := make([]*CheckResult, 0)
-	t.setup()
 	for _, check := range t.checks {
 		err := check.Test(dp)
 		res = append(res, &CheckResult{check, err})
@@ -71,7 +70,7 @@ func generateTestSlice(len int) []byte {
 }
 
 //======== our actual checks =============
-var isEmpty = &Check{
+var CheckIsEmpty = &Check{
 	Test: func(dp DataProvider) error {
 		list, err := ReadDir(dp, "")
 		if err != nil {
@@ -100,7 +99,7 @@ var isEmpty = &Check{
 	Name:        "Empty DataProvider",
 	Description: "Checks the corner case of an empty DataProvider",
 }
-var canWrite0 = &Check{
+var CheckCanWrite0 = &Check{
 	Test: func(dp DataProvider) error {
 		paths := []Path{"", "/", "/canWrite0", "/canWrite0/subfolder", "canWrite0_1/subfolder1/subfolder2"}
 		lengths := []int{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 512, 1024, 4096, 4097, 8192, 8193}
