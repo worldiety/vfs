@@ -98,8 +98,8 @@ type PathEntry struct {
 	Resource *ResourceInfo
 }
 
-// ReadFully loads the entire resource into memory
-func ReadFully(provider DataProvider, path Path) ([]byte, error) {
+// ReadAll loads the entire resource into memory
+func ReadAll(provider DataProvider, path Path) ([]byte, error) {
 	reader, err := provider.Read(path)
 	if err != nil {
 		return nil, err
@@ -113,4 +113,32 @@ func ReadFully(provider DataProvider, path Path) ([]byte, error) {
 	}
 
 	return buf.Bytes(), nil
+}
+
+// WriteAll just puts the given data into the path
+func WriteAll(provider DataProvider, path Path, data []byte) (int, error) {
+	writer, err := provider.Write(path)
+	if err != nil {
+		return 0, err
+	}
+	defer silentClose(writer)
+
+	n, err := writer.Write(data)
+	if err != nil {
+		return n, err
+	}
+	if n != len(data) {
+		return n, fmt.Errorf("provider %v.Write has violated the Write contract", provider)
+	}
+	return n, nil
+}
+
+// Stat simply allocates a ResourceInfo and reads it, which must be supported by all implementations.
+func Stat(provider DataProvider, path Path) (*ResourceInfo, error) {
+	info := &ResourceInfo{}
+	err := provider.ReadAttrs(path, info)
+	if err != nil {
+		return info, err
+	}
+	return info, nil
 }

@@ -1,6 +1,7 @@
 package vfs
 
 import (
+	"bytes"
 	"fmt"
 	"strconv"
 	"strings"
@@ -50,6 +51,8 @@ func (t *CTS) All() {
 		CheckIsEmpty,
 		CheckCanWrite0,
 		CheckReadAny,
+		CheckWriteAndRead,
+		CheckRename,
 	}
 }
 
@@ -149,7 +152,7 @@ var CheckReadAny = &Check{
 			if entry.Resource.Mode.IsDir() {
 				continue
 			}
-			tmp, err := ReadFully(dp, entry.Path)
+			tmp, err := ReadAll(dp, entry.Path)
 			if err != nil {
 				return err
 			}
@@ -161,4 +164,121 @@ var CheckReadAny = &Check{
 	},
 	Name:        "Read any",
 	Description: "Asserts that nothing is empty and everything can be read",
+}
+
+var CheckWriteAndRead = &Check{
+	Test: func(dp DataProvider) error {
+		paths := []Path{"", "/", "/canWrite1", "/canWrite1/subfolder", "canWrite1_1/subfolder1/subfolder2"}
+		lengths := []int{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 512, 1024, 4096, 4097, 8192, 8193}
+		for _, path := range paths {
+			for _, testLen := range lengths {
+				tmp := generateTestSlice(testLen)
+				child := path.Child(strconv.Itoa(testLen) + ".bin")
+				writer, err := dp.Write(child)
+				if err != nil {
+					return err
+				}
+				n, err := writer.Write(tmp)
+				if err != nil {
+					writer.Close()
+					return err
+				}
+
+				err = writer.Close()
+				if err != nil {
+					return err
+				}
+
+				if n != len(tmp) {
+					return fmt.Errorf("expected to write %v bytes but just wrote %v", len(tmp), n)
+				}
+
+				data, err := ReadAll(dp, child)
+				if err != nil {
+					return err
+				}
+
+				if bytes.Compare(data, tmp) != 0 {
+					return fmt.Errorf("expected that written and read bytes are equal but %v != %v", tmp, data)
+				}
+			}
+		}
+
+		return nil
+	},
+	Name:        "Write and Read",
+	Description: "Write some stuff and read it agains",
+}
+
+var CheckRename = &Check{
+	Test: func(dp DataProvider) error {
+		a := Path("/a.bin")
+		b := Path("/b.bin")
+
+		err := dp.Delete(a)
+		if err != nil {
+			return err
+		}
+
+		err = dp.Delete(b)
+		if err != nil {
+			return err
+		}
+
+		//renaming of non-a to non-b must fail
+		err = dp.Rename(a, b)
+		if err == nil {
+			return fmt.Errorf("renaming of non-a to non-b must fail")
+		}
+
+		test0 := generateTestSlice(7)
+		_, err = WriteAll(dp, a, test0)
+		if err != nil {
+			return err
+		}
+
+		// a exists and b not, must succeed
+		err = dp.Rename(a, b)
+		if err != nil {
+			return err
+		}
+		_, err = Stat(dp, a)
+		if err == nil {
+			return fmt.Errorf("a must be ResourceNotFound")
+		}
+		info, err := Stat(dp, b)
+		if err != nil {
+			return fmt.Errorf("b must be available")
+		}
+		if info.Size != 7 {
+			return fmt.Errorf("a must be 7 bytes long but is %v", info.Size)
+		}
+
+		// b exists and c exists, must succeed
+		c := Path("/c.bin")
+		_, err = WriteAll(dp, c, generateTestSlice(13))
+		if err != nil {
+			return err
+		}
+
+		err = dp.Rename(b, c)
+		if err != nil {
+			return err
+		}
+		_, err = Stat(dp, b)
+		if err == nil {
+			return fmt.Errorf("b must be ResourceNotFound")
+		}
+
+		info, err = Stat(dp, c)
+		if err != nil {
+			return err
+		}
+		if info.Size != 7 {
+			return fmt.Errorf("a must be 7 bytes long but is %v", info.Size)
+		}
+		return nil
+	},
+	Name:        "Rename",
+	Description: "Renames and their corner cases",
 }
