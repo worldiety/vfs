@@ -9,7 +9,42 @@ type Wrapper interface {
 	Unwrap() error
 }
 
-// AsValue is a Draft method to unwrap an error from a chain of errors
-func AsValue(e interface{}) {
+//ForEachErr loops each error started at root
+func ForEachErr(root error, closure func(err error) bool) {
+	for root != nil {
+		if !closure(root) {
+			return
+		}
+		if causer, ok := root.(Wrapper); ok {
+			root = causer.Unwrap()
+		}
+	}
+}
 
+// UnwrapUnsupportedAttributesError either returns the first occurrence of UnsupportedAttributesError or nil
+func UnwrapUnsupportedAttributesError(root error) *UnsupportedAttributesError {
+	var tmp *UnsupportedAttributesError
+	ForEachErr(root, func(err error) bool {
+		if myErr, ok := err.(*UnsupportedAttributesError); ok {
+			tmp = myErr
+			return true
+		}
+		return false
+	})
+
+	return tmp
+}
+
+// UnsupportedOperationError either returns the first occurrence of UnsupportedAttributesError or nil
+func UnwrapUnsupportedOperationError(root error) *UnsupportedOperationError {
+	var tmp *UnsupportedOperationError
+	ForEachErr(root, func(err error) bool {
+		if myErr, ok := err.(*UnsupportedOperationError); ok {
+			tmp = myErr
+			return true
+		}
+		return false
+	})
+
+	return tmp
 }

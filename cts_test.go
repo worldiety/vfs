@@ -53,6 +53,8 @@ func (t *CTS) All() {
 		CheckReadAny,
 		CheckWriteAndRead,
 		CheckRename,
+		UnsupportedAttributes,
+		CloseProvider,
 	}
 }
 
@@ -281,4 +283,113 @@ var CheckRename = &Check{
 	},
 	Name:        "Rename",
 	Description: "Renames and their corner cases",
+}
+
+var UnsupportedAttributes = &Check{Test: func(dp DataProvider) error {
+	c := Path("/c.bin")
+	_, err := WriteAll(dp, c, generateTestSlice(13))
+	if err != nil {
+		return err
+	}
+	mustSupport := &ResourceInfo{}
+	err = dp.ReadAttrs(c, mustSupport)
+	if err != nil {
+		return err
+	}
+
+	mustNotSupport := &unsupportedType{}
+	err = dp.ReadAttrs(c, mustNotSupport)
+	if err == nil {
+		return fmt.Errorf("reading into a generic unsupportedType{} with private members and no public fields is an error")
+	} else {
+		if UnwrapUnsupportedAttributesError(err) == nil {
+			return fmt.Errorf("expected UnsupportedAttributesError but got %v", err)
+		}
+	}
+
+	err = dp.ReadAttrs(c, "hello world")
+	if err == nil {
+		return fmt.Errorf("reading into a value type like a string is always a programming error")
+	} else {
+		if UnwrapUnsupportedAttributesError(err) == nil {
+			return fmt.Errorf("expected UnsupportedAttributesError but got %v", err)
+		}
+	}
+
+	dir, err := dp.ReadDir("")
+	if err != nil {
+		return err
+	}
+	count := 0
+	err = dir.ForEach(func(scanner Scanner) error {
+		mustSupport := &ResourceInfo{}
+		err = scanner.Scan(mustSupport)
+		if err != nil {
+			return err
+		}
+
+		mustNotSupport := &unsupportedType{}
+		err = scanner.Scan(mustNotSupport)
+		if err == nil {
+			return fmt.Errorf("reading into a generic unsupportedType{} with private members and no public fields is an error")
+		} else {
+			if UnwrapUnsupportedAttributesError(err) == nil {
+				return fmt.Errorf("expected UnsupportedAttributesError but got %v", err)
+			}
+		}
+
+		err = scanner.Scan("hello world")
+		if err == nil {
+			return fmt.Errorf("reading into a value type like a string is always a programming error")
+		} else {
+			if UnwrapUnsupportedAttributesError(err) == nil {
+				return fmt.Errorf("expected UnsupportedAttributesError but got %v", err)
+			}
+		}
+		count++
+
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+	if count <= 0 {
+		return fmt.Errorf("expected at least 1 file to scan")
+	}
+	err = dir.Close()
+	if err != nil {
+		return err
+	}
+
+	// same for write
+	err = dp.WriteAttrs(c, mustNotSupport)
+	if err == nil {
+		return fmt.Errorf("writing from a generic unsupportedType{} with private members and no public fields is an error")
+	} else {
+		if UnwrapUnsupportedAttributesError(err) == nil && UnwrapUnsupportedOperationError(err) == nil {
+			return fmt.Errorf("expected UnsupportedAttributesError or UnsupportedOperationError but got %v", err)
+		}
+	}
+	return nil
+
+},
+	Name:        "Attributes",
+	Description: "Tries to read unsupported attributes.",
+}
+
+type unsupportedType struct {
+	atLeastHiddenFieldsAreNotAllowed string
+}
+
+var CloseProvider = &Check{
+	Test: func(dp DataProvider) error {
+		err := dp.Close()
+		if err != nil {
+			return err
+		}
+
+		return nil
+	},
+	Name:        "Close",
+	Description: "Simply checks if close succeeds. It does not mean that the DataProvider is unusable, because some are stateless",
 }

@@ -56,14 +56,16 @@ type MountableDataProvider struct {
 
 // Rename details: see DataProvider#Rename
 func (p *MountableDataProvider) Rename(oldPath Path, newPath Path) error {
-	mp0, providerPath0, dp0 := p.Resolve(oldPath)
+	mp0, _, dp0 := p.Resolve(oldPath)
 	mp1, _, _ := p.Resolve(newPath)
 	if mp0 != mp1 {
 		return &UnsupportedOperationError{Message: "cannot rename across mount points: " + mp0.String() + " -> " + mp1.String()}
 	}
 
 	if dp0 != nil {
-		return dp0.MkDirs(providerPath0)
+		unwrapedOld := oldPath.TrimPrefix(mp0)
+		unwrappedNew := newPath.TrimPrefix(mp1)
+		return dp0.Rename(unwrapedOld, unwrappedNew)
 	}
 	return &MountPointNotFoundError{}
 }
@@ -132,6 +134,11 @@ func (p *MountableDataProvider) Resolve(path Path) (mountPoint Path, providerPat
 			//found the mount point
 			return mountPoint, path.TrimPrefix(mountPoint), dp
 		}
+		if vdir, ok := child.data.(*virtualDir); ok {
+			parent = vdir
+		} else {
+			panic("implementation assertion")
+		}
 	}
 	return "", "", nil
 }
@@ -163,6 +170,9 @@ func (p *MountableDataProvider) ReadDir(path Path) (DirEntList, error) {
 	//just try to walk
 	parent := p.getRoot()
 	names := path.Names()
+	if len(names) == 0 {
+		return &virtualDirEntList{p.root}, nil
+	}
 	var child *namedEntry
 	for _, name := range names {
 		child = parent.ChildByName(name)
@@ -199,8 +209,12 @@ func (p *MountableDataProvider) Write(path Path) (io.WriteCloser, error) {
 func (p *MountableDataProvider) Delete(path Path) error {
 	_, providerPath, dp := p.Resolve(path)
 	if dp != nil {
-		return dp.Delete(providerPath)
+		//do not delegate empty path delete
+		if providerPath.NameCount() > 0 {
+			return dp.Delete(providerPath)
+		}
 	}
+
 	//just try to walk and clean any mount points
 	parent := p.getRoot()
 	names := path.Names()
@@ -209,9 +223,15 @@ func (p *MountableDataProvider) Delete(path Path) error {
 		if child == nil {
 			return &ResourceNotFoundError{Path: path}
 		}
+		if vdir, ok := child.data.(*virtualDir); ok {
+			parent = vdir
+		}
 	}
-	parent.RemoveChild(names[len(names)-1])
-	return &MountPointNotFoundError{}
+	tmp := parent.RemoveChild(names[len(names)-1])
+	if tmp == nil {
+		return &MountPointNotFoundError{}
+	}
+	return nil
 }
 
 type virtualDirEntList struct {

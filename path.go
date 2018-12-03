@@ -49,12 +49,12 @@ type Path string
 
 // StartsWith tests whether the path begins with prefix.
 func (p Path) StartsWith(prefix Path) bool {
-	return strings.HasPrefix(string(p), string(prefix))
+	return strings.HasPrefix(p.String(), prefix.String())
 }
 
 // EndsWith tests whether the path ends with prefix.
 func (p Path) EndsWith(suffix Path) bool {
-	return strings.HasSuffix(string(p), string(suffix))
+	return strings.HasSuffix(p.String(), suffix.String())
 }
 
 // Names splits the path by / and returns all segments as a simple string array.
@@ -86,7 +86,7 @@ func (p Path) NameAt(idx int) string {
 func (p Path) Name() string {
 	tmp := p.Names()
 	if len(tmp) > 0 {
-		return tmp[len(tmp)]
+		return tmp[len(tmp)-1]
 	}
 	return ""
 }
@@ -107,6 +107,13 @@ func (p Path) String() string {
 
 // Child returns a new Path with name appended as a child
 func (p Path) Child(name string) Path {
+	if len(p) == 0 {
+		if strings.HasPrefix(name, "/") {
+			return Path(name)
+		} else {
+			return Path("/" + name)
+		}
+	}
 	if strings.HasPrefix(name, "/") {
 		return Path(p.String() + name)
 	}
@@ -136,7 +143,7 @@ func (p Path) Normalize() Path {
 		}
 		tmp = append(tmp, name)
 	}
-	return Path("/" + strings.Join(p.Names(), "/"))
+	return Path("/" + strings.Join(tmp, "/"))
 }
 
 // ConcatPaths merges all paths together
