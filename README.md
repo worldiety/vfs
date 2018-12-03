@@ -30,3 +30,5 @@ incompatible structrual API changes anymore. However the CTS profiles will be up
 | Read any|:white_check_mark: |
 | Write and Read|:white_check_mark: |
 | Rename|:white_check_mark: |
+| Attributes|:white_check_mark: |
+| Close|:white_check_mark: |
