@@ -157,7 +157,7 @@ func Walk(path Path, each WalkClosure) error {
 		}
 		return nil
 	})
-	return nil
+	return err
 }
 
 // A PathEntry simply provides a Path and the related ResourceInfo
