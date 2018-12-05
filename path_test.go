@@ -100,6 +100,12 @@ func TestModPath(t *testing.T) {
 	if p.String() != "/d/x/y/z" {
 		t.Fatal("expected /d/x/y/z but got", p)
 	}
+
+	p = ""
+	p = p.Child("/a/b/c")
+	if p.String() != "/a/b/c" {
+		t.Fatal("expected /a/b/c but got", p)
+	}
 }
 
 func TestPath_Normalize(t *testing.T) {

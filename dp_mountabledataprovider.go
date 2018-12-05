@@ -7,6 +7,7 @@ import (
 
 var _ DataProvider = (*MountableDataProvider)(nil)
 
+
 type virtualDir struct {
 	children []*namedEntry
 }

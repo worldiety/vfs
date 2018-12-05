@@ -61,6 +61,7 @@ func (t *CTS) All() {
 func (t *CTS) Run(dp DataProvider) CTSResult {
 	res := make([]*CheckResult, 0)
 	for _, check := range t.checks {
+		SetDefault(dp)
 		err := check.Test(dp)
 		res = append(res, &CheckResult{check, err})
 	}
@@ -78,7 +79,7 @@ func generateTestSlice(len int) []byte {
 //======== our actual checks =============
 var CheckIsEmpty = &Check{
 	Test: func(dp DataProvider) error {
-		list, err := ReadDir(dp, "")
+		list, err := ReadDirEnt("")
 		if err != nil {
 			return err
 		}
@@ -93,7 +94,7 @@ var CheckIsEmpty = &Check{
 			}
 		}
 		// recheck
-		list, err = ReadDir(dp, "")
+		list, err = ReadDirEnt("")
 		if err != nil {
 			return err
 		}
@@ -142,7 +143,7 @@ var CheckCanWrite0 = &Check{
 
 var CheckReadAny = &Check{
 	Test: func(dp DataProvider) error {
-		list, err := ReadDirs(dp, "")
+		list, err := ReadDirEntRecur("")
 		if err != nil {
 			return err
 		}
@@ -154,7 +155,7 @@ var CheckReadAny = &Check{
 			if entry.Resource.Mode.IsDir() {
 				continue
 			}
-			tmp, err := ReadAll(dp, entry.Path)
+			tmp, err := ReadAll(entry.Path)
 			if err != nil {
 				return err
 			}
@@ -176,7 +177,7 @@ var CheckWriteAndRead = &Check{
 			for _, testLen := range lengths {
 				tmp := generateTestSlice(testLen)
 				child := path.Child(strconv.Itoa(testLen) + ".bin")
-				writer, err := dp.Write(child)
+				writer, err := Write(child)
 				if err != nil {
 					return err
 				}
@@ -195,7 +196,7 @@ var CheckWriteAndRead = &Check{
 					return fmt.Errorf("expected to write %v bytes but just wrote %v", len(tmp), n)
 				}
 
-				data, err := ReadAll(dp, child)
+				data, err := ReadAll(child)
 				if err != nil {
 					return err
 				}
@@ -222,19 +223,19 @@ var CheckRename = &Check{
 			return err
 		}
 
-		err = dp.Delete(b)
+		err = Delete(b)
 		if err != nil {
 			return err
 		}
 
 		//renaming of non-a to non-b must fail
-		err = dp.Rename(a, b)
+		err = Rename(a, b)
 		if err == nil {
 			return fmt.Errorf("renaming of non-a to non-b must fail")
 		}
 
 		test0 := generateTestSlice(7)
-		_, err = WriteAll(dp, a, test0)
+		_, err = WriteAll(a, test0)
 		if err != nil {
 			return err
 		}
@@ -244,11 +245,11 @@ var CheckRename = &Check{
 		if err != nil {
 			return err
 		}
-		_, err = Stat(dp, a)
+		_, err = Stat(a)
 		if err == nil {
 			return fmt.Errorf("a must be ResourceNotFound")
 		}
-		info, err := Stat(dp, b)
+		info, err := Stat(b)
 		if err != nil {
 			return fmt.Errorf("b must be available")
 		}
@@ -258,7 +259,7 @@ var CheckRename = &Check{
 
 		// b exists and c exists, must succeed
 		c := Path("/c.bin")
-		_, err = WriteAll(dp, c, generateTestSlice(13))
+		_, err = WriteAll(c, generateTestSlice(13))
 		if err != nil {
 			return err
 		}
@@ -267,12 +268,12 @@ var CheckRename = &Check{
 		if err != nil {
 			return err
 		}
-		_, err = Stat(dp, b)
+		_, err = Stat(b)
 		if err == nil {
 			return fmt.Errorf("b must be ResourceNotFound")
 		}
 
-		info, err = Stat(dp, c)
+		info, err = Stat(c)
 		if err != nil {
 			return err
 		}
@@ -287,7 +288,7 @@ var CheckRename = &Check{
 
 var UnsupportedAttributes = &Check{Test: func(dp DataProvider) error {
 	c := Path("/c.bin")
-	_, err := WriteAll(dp, c, generateTestSlice(13))
+	_, err := WriteAll(c, generateTestSlice(13))
 	if err != nil {
 		return err
 	}
@@ -301,25 +302,29 @@ var UnsupportedAttributes = &Check{Test: func(dp DataProvider) error {
 	err = dp.ReadAttrs(c, mustNotSupport)
 	if err == nil {
 		return fmt.Errorf("reading into a generic unsupportedType{} with private members and no public fields is an error")
-	} else {
-		if UnwrapUnsupportedAttributesError(err) == nil {
-			return fmt.Errorf("expected UnsupportedAttributesError but got %v", err)
-		}
+	}
+	if UnwrapUnsupportedAttributesError(err) == nil {
+		return fmt.Errorf("expected UnsupportedAttributesError but got %v", err)
 	}
 
-	err = dp.ReadAttrs(c, "hello world")
+	err = ReadAttrs(c, "hello world")
 	if err == nil {
 		return fmt.Errorf("reading into a value type like a string is always a programming error")
-	} else {
-		if UnwrapUnsupportedAttributesError(err) == nil {
-			return fmt.Errorf("expected UnsupportedAttributesError but got %v", err)
-		}
+	}
+	if UnwrapUnsupportedAttributesError(err) == nil {
+		return fmt.Errorf("expected UnsupportedAttributesError but got %v", err)
 	}
 
 	dir, err := dp.ReadDir("")
 	if err != nil {
 		return err
 	}
+
+	dir, err = ReadDir("")
+	if err != nil {
+		return err
+	}
+
 	count := 0
 	err = dir.ForEach(func(scanner Scanner) error {
 		mustSupport := &ResourceInfo{}
@@ -332,20 +337,19 @@ var UnsupportedAttributes = &Check{Test: func(dp DataProvider) error {
 		err = scanner.Scan(mustNotSupport)
 		if err == nil {
 			return fmt.Errorf("reading into a generic unsupportedType{} with private members and no public fields is an error")
-		} else {
-			if UnwrapUnsupportedAttributesError(err) == nil {
-				return fmt.Errorf("expected UnsupportedAttributesError but got %v", err)
-			}
+		}
+		if UnwrapUnsupportedAttributesError(err) == nil {
+			return fmt.Errorf("expected UnsupportedAttributesError but got %v", err)
 		}
 
 		err = scanner.Scan("hello world")
 		if err == nil {
 			return fmt.Errorf("reading into a value type like a string is always a programming error")
-		} else {
-			if UnwrapUnsupportedAttributesError(err) == nil {
-				return fmt.Errorf("expected UnsupportedAttributesError but got %v", err)
-			}
 		}
+		if UnwrapUnsupportedAttributesError(err) == nil {
+			return fmt.Errorf("expected UnsupportedAttributesError but got %v", err)
+		}
+
 		count++
 
 		return nil
@@ -365,11 +369,11 @@ var UnsupportedAttributes = &Check{Test: func(dp DataProvider) error {
 	err = dp.WriteAttrs(c, mustNotSupport)
 	if err == nil {
 		return fmt.Errorf("writing from a generic unsupportedType{} with private members and no public fields is an error")
-	} else {
-		if UnwrapUnsupportedAttributesError(err) == nil && UnwrapUnsupportedOperationError(err) == nil {
-			return fmt.Errorf("expected UnsupportedAttributesError or UnsupportedOperationError but got %v", err)
-		}
 	}
+	if UnwrapUnsupportedAttributesError(err) == nil && UnwrapUnsupportedOperationError(err) == nil {
+		return fmt.Errorf("expected UnsupportedAttributesError or UnsupportedOperationError but got %v", err)
+	}
+
 	return nil
 
 },

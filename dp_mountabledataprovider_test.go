@@ -8,8 +8,9 @@ func TestSimpleDelegation(t *testing.T) {
 
 	dp := &MountableDataProvider{}
 	dp.Mount("mnt/local", fs)
+	SetDefault(dp)
 
-	infos, err := ReadDir(dp, "/")
+	infos, err := ReadDirEnt("/")
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
@@ -19,7 +20,7 @@ func TestSimpleDelegation(t *testing.T) {
 	}
 
 	//
-	infos, err = ReadDir(dp, "/mnt/")
+	infos, err = ReadDirEnt("/mnt/")
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
@@ -29,7 +30,7 @@ func TestSimpleDelegation(t *testing.T) {
 	}
 
 	//
-	infos, err = ReadDir(dp, "/mnt/local")
+	infos, err = ReadDirEnt("/mnt/local")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -40,13 +41,13 @@ func TestSimpleDelegation(t *testing.T) {
 
 	// write into mounted dir
 	c := Path("/mnt/local/c.bin")
-	_, err = WriteAll(dp, c, generateTestSlice(13))
+	_, err = WriteAll(c, generateTestSlice(13))
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// read from mounted dir
-	data, err := ReadAll(dp, c)
+	data, err := ReadAll(c)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -55,7 +56,7 @@ func TestSimpleDelegation(t *testing.T) {
 	}
 
 	// stat from mounted dir
-	stat, err := Stat(dp, c)
+	stat, err := Stat(c)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -64,7 +65,7 @@ func TestSimpleDelegation(t *testing.T) {
 	}
 
 	// list again
-	infos, err = ReadDir(dp, "/mnt/local")
+	infos, err = ReadDirEnt("/mnt/local")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -87,7 +88,7 @@ func TestSimpleDelegation(t *testing.T) {
 	}
 
 	// list again
-	infos, err = ReadDir(dp, "/mnt/local")
+	infos, err = ReadDirEnt("/mnt/local")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -102,7 +103,7 @@ func TestSimpleDelegation(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	stat, err = Stat(dp, e)
+	stat, err = Stat(e)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -114,7 +115,7 @@ func TestSimpleDelegation(t *testing.T) {
 	}
 
 	// check
-	stat, err = Stat(dp, e)
+	stat, err = Stat(e)
 	if err == nil {
 		t.Fatal("expected error but got success")
 	}

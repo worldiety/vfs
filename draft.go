@@ -35,7 +35,7 @@ func UnwrapUnsupportedAttributesError(root error) *UnsupportedAttributesError {
 	return tmp
 }
 
-// UnsupportedOperationError either returns the first occurrence of UnsupportedAttributesError or nil
+// UnwrapUnsupportedOperationError either returns the first occurrence of UnsupportedAttributesError or nil
 func UnwrapUnsupportedOperationError(root error) *UnsupportedOperationError {
 	var tmp *UnsupportedOperationError
 	ForEachErr(root, func(err error) bool {

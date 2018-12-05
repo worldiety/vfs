@@ -110,9 +110,9 @@ func (p Path) Child(name string) Path {
 	if len(p) == 0 {
 		if strings.HasPrefix(name, "/") {
 			return Path(name)
-		} else {
-			return Path("/" + name)
 		}
+		return Path("/" + name)
+
 	}
 	if strings.HasPrefix(name, "/") {
 		return Path(p.String() + name)
