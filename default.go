@@ -166,6 +166,17 @@ type PathEntry struct {
 	Resource *ResourceInfo
 }
 
+// Equals checks for equality with another PathEntry
+func (e *PathEntry) Equals(other interface{}) bool {
+	if e == nil || other == nil {
+		return false
+	}
+	if o, ok := other.(*PathEntry); ok {
+		return o.Path == e.Path && o.Resource.Equals(e.Resource)
+	}
+	return false
+}
+
 // ReadAll loads the entire resource into memory. Only use it, if you know that it fits into memory
 func ReadAll(path Path) ([]byte, error) {
 	reader, err := Default().Read(path)

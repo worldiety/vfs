@@ -1,6 +1,9 @@
 package vfs
 
-import "testing"
+import (
+	"os"
+	"testing"
+)
 
 func TestEmptyPath(t *testing.T) {
 	cases := []string{"", "/"}
@@ -188,5 +191,31 @@ func TestPath_EndsWith(t *testing.T) {
 	p = Path("a/b/c/d")
 	if !p.EndsWith("/d") {
 		t.Fatal("expected to end with '/d'")
+	}
+}
+
+func TestPathEntry(t *testing.T) {
+	a := &PathEntry{"/my/a", &ResourceInfo{"a", 1, 0, 1234}}
+	a2 := &PathEntry{"/my/a", &ResourceInfo{"a", 1, 0, 1234}}
+	b := &PathEntry{"/my/b", &ResourceInfo{"b", -1, os.ModeDir, 4566}}
+
+	if a.Equals(b) {
+		t.Fatal("should not be equal")
+	}
+
+	if !a.Equals(a2) {
+		t.Fatal("should be equal")
+	}
+
+	if a.Equals(nil) {
+		t.Fatal("nil never equal")
+	}
+	a = nil
+	if a.Equals(nil) {
+		t.Fatal("nil never equal")
+	}
+
+	if a2.Equals("hallo") {
+		t.Fatal("other type never equal")
 	}
 }

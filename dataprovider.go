@@ -91,3 +91,14 @@ type ResourceInfo struct {
 	Mode    os.FileMode // file mode bits. Mode.IsDir and Mode.IsRegular are your friends.
 	ModTime int64       // modification time in milliseconds since epoch 1970.
 }
+
+// Equals checks for equality with another PathEntry
+func (e *ResourceInfo) Equals(other interface{}) bool {
+	if e == nil || other == nil {
+		return false
+	}
+	if o, ok := other.(*ResourceInfo); ok {
+		return o.Name == e.Name && o.Size == e.Size && o.ModTime == e.ModTime && o.Mode == e.Mode
+	}
+	return false
+}
