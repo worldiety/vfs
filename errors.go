@@ -2,6 +2,7 @@ package vfs
 
 import "fmt"
 
+
 // A MountPointNotFoundError is only used by the MountableDataProvider to indicate that the given path cannot be
 // associated with a mounted DataProvider. Check your prefix.
 type MountPointNotFoundError struct {

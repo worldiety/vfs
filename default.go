@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"math"
+	"sync/atomic"
 )
 
 var prov DataProvider = &FilesystemDataProvider{}
@@ -220,4 +221,208 @@ func Stat(path Path) (*ResourceInfo, error) {
 		return info, err
 	}
 	return info, nil
+}
+
+// CopyOptions is used to define the process of copying.
+type CopyOptions struct {
+	cancelled int32
+
+	// OnScan is called while scanning the source
+	OnScan func(obj Path, objects int64, bytes int64)
+
+	// OnCopied is called after each transferred object.
+	OnCopied func(obj Path, objectsTransferred int64, bytesTransferred int64)
+
+	// OnProgress is called for each file which is progress of being copied
+	OnProgress func(src Path, dst Path, bytes int64, size int64)
+
+	// OnError is called if an error occurs. If an error is returned, the process is stopped and the returned error is returned.
+	OnError func(object Path, err error) error
+}
+
+// Cancel is used to signal an interruption
+func (o *CopyOptions) Cancel() {
+	atomic.StoreInt32(&o.cancelled, 1)
+}
+
+// IsCancelled checks if the copy process has been cancelled
+func (o *CopyOptions) IsCancelled() bool {
+	if o == nil {
+		return false
+	}
+	return atomic.LoadInt32(&o.cancelled) == 1
+}
+
+func (o *CopyOptions) onProgress(src Path, dst Path, bytes int64, size int64) {
+	if o == nil || o.OnProgress == nil {
+		return
+	}
+	o.OnProgress(src, dst, bytes, size)
+}
+
+func (o *CopyOptions) onScan(obj Path, objects int64, bytes int64) {
+	if o == nil || o.OnScan == nil {
+		return
+	}
+	o.OnScan(obj, objects, bytes)
+}
+
+func (o *CopyOptions) onCopied(obj Path, objectsTransferred int64, bytesTransferred int64) {
+	if o == nil || o.OnCopied == nil {
+		return
+	}
+	o.OnCopied(obj, objectsTransferred, bytesTransferred)
+}
+
+func (o *CopyOptions) onError(object Path, err error) error {
+	if o == nil || o.OnError == nil {
+		return err
+	}
+	return o.OnError(object, err)
+}
+
+// Copy performs a copy from src to dst. Dst is always removed and replaced with the contents of src.
+// The copy options can be nil and can be used to get detailed information on the progress
+func Copy(src Path, dst Path, options *CopyOptions) error {
+
+	// first try to stat
+	info, err := Stat(src)
+	if err != nil {
+		return err
+	}
+
+	// cleanup dst
+	err = Delete(dst)
+	if err != nil {
+		return err
+	}
+
+	if info.Mode.IsDir() {
+		var objectsFound int64
+		var bytesFound int64
+		var objectsProcessed int64
+		var bytesProcessed int64
+		// collect info
+		list := make([]*PathEntry, 0)
+		err = Walk(src, func(path Path, info *ResourceInfo, err error) error {
+			if err != nil {
+				return options.onError(path, err)
+			}
+			list = append(list, &PathEntry{path, info})
+			objectsFound++
+			if info.Mode.IsRegular() {
+				bytesFound += info.Size
+			}
+			options.onScan(path, objectsFound, bytesFound)
+			return nil
+		})
+
+		if err != nil {
+			return err
+		}
+
+		//walk through, directory are first
+		for _, entry := range list {
+			dstPath := ConcatPaths(dst, entry.Path.TrimPrefix(src))
+			if entry.Resource.Mode.IsDir() {
+				err := MkDirs(dstPath)
+				if err != nil {
+					err = options.onError(dstPath, err)
+					if err != nil {
+						return err
+					}
+				}
+				objectsProcessed++
+				options.onCopied(entry.Path, objectsProcessed, bytesProcessed)
+			} else
+
+			if entry.Resource.Mode.IsRegular() {
+				reader, err := Read(entry.Path)
+				if err != nil {
+					return err
+				}
+				writer, err := Write(dstPath)
+				if err != nil {
+					silentClose(reader)
+					return err
+				}
+				written, err := copyBuffer(entry.Path, dstPath, entry.Resource.Size, reader, writer, nil, options)
+				silentClose(reader)
+				silentClose(writer)
+				if err != nil {
+					err = options.onError(dstPath, err)
+					if err != nil {
+						return err
+					}
+					return err
+				}
+				objectsProcessed++
+				bytesProcessed += written
+				options.onCopied(entry.Path, objectsProcessed, bytesProcessed)
+
+			} else {
+				err = options.onError(entry.Path, fmt.Errorf("unsupported path object %v", entry.Path))
+				if err != nil {
+					return err
+				}
+			}
+		}
+		return nil
+	} else {
+		options.onScan(src, 1, info.Size)
+		//just copy file
+		reader, err := Read(src)
+		if err != nil {
+			return err
+		}
+		defer silentClose(reader)
+		writer, err := Write(dst)
+		if err != nil {
+			return err
+		}
+		defer silentClose(writer)
+		written, err := copyBuffer(src, dst, info.Size, reader, writer, nil, options)
+		if err != nil {
+			return err
+		}
+		options.onCopied(src, 1, written)
+		return nil
+	}
+}
+
+func copyBuffer(srcPath Path, dstPath Path, totalSize int64, src io.Reader, dst io.Writer, buf []byte, options *CopyOptions) (written int64, err error) {
+	if buf == nil {
+		size := 32 * 1024
+		buf = make([]byte, size)
+	}
+	for {
+		if options.IsCancelled() {
+			err = &CancellationError{}
+			break
+		}
+
+		nr, er := src.Read(buf)
+		if nr > 0 {
+			nw, ew := dst.Write(buf[0:nr])
+			if nw > 0 {
+				written += int64(nw)
+			}
+			options.onProgress(srcPath, dstPath, written, totalSize)
+			if ew != nil {
+				err = ew
+				break
+			}
+			if nr != nw {
+				err = io.ErrShortWrite
+				break
+			}
+		}
+		if er != nil {
+			if er != io.EOF {
+				err = er
+			}
+			break
+		}
+	}
+	return written, err
 }

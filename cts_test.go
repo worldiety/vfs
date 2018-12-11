@@ -3,6 +3,7 @@ package vfs
 import (
 	"bytes"
 	"fmt"
+	"log"
 	"strconv"
 	"strings"
 )
@@ -172,7 +173,7 @@ var CheckReadAny = &Check{
 var CheckWriteAndRead = &Check{
 	Test: func(dp DataProvider) error {
 		paths := []Path{"", "/", "/canWrite1", "/canWrite1/subfolder", "canWrite1_1/subfolder1/subfolder2"}
-		lengths := []int{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 512, 1024, 4096, 4097, 8192, 8193}
+		lengths := []int{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 512, 1024, 4096, 4097, 8192, 8193, 128 * 1024 * 3}
 		for _, path := range paths {
 			for _, testLen := range lengths {
 				tmp := generateTestSlice(testLen)
@@ -204,7 +205,31 @@ var CheckWriteAndRead = &Check{
 				if bytes.Compare(data, tmp) != 0 {
 					return fmt.Errorf("expected that written and read bytes are equal but %v != %v", tmp, data)
 				}
+
 			}
+		}
+
+		// check copy method
+		err := Copy("canWrite1_1", "canWrite2", nil)
+		if err != nil {
+			return err
+		}
+
+		opts := &CopyOptions{OnCopied: func(obj Path, objectsTransferred int64, bytesTransferred int64) {
+			log.Printf("completed obj # %v %v, total %v bytes\n", objectsTransferred, obj, bytesTransferred)
+		}, OnProgress: func(src Path, dst Path, bytes int64, size int64) {
+			log.Printf("copied %v -> %v %v%%\n", src, dst, float32(bytes)/float32(size)*100)
+		}, OnScan: func(obj Path, objects int64, bytes int64) {
+			log.Printf("found obj # %v %v, total %v bytes\n", objects, obj, bytes)
+		}}
+		err = Copy("canWrite1_1", "canWrite2", opts)
+		if err != nil {
+			return err
+		}
+
+		err = Copy("512.bin", "copy512.bin", nil)
+		if err != nil {
+			return err
 		}
 
 		return nil
