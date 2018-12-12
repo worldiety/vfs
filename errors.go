@@ -2,7 +2,6 @@ package vfs
 
 import "fmt"
 
-
 // A MountPointNotFoundError is only used by the MountableDataProvider to indicate that the given path cannot be
 // associated with a mounted DataProvider. Check your prefix.
 type MountPointNotFoundError struct {
@@ -16,7 +15,7 @@ func (e *MountPointNotFoundError) Unwrap() error {
 }
 
 func (e *MountPointNotFoundError) Error() string {
-	return "not found: " + e.MountPoint
+	return "MountPointNotFoundError: " + e.MountPoint
 }
 
 // UnsupportedOperationError is always returned, if an implementation does not support a function in general.
@@ -26,7 +25,7 @@ type UnsupportedOperationError struct {
 }
 
 func (e *UnsupportedOperationError) Error() string {
-	return e.Message
+	return "UnsupportedOperationError: " + e.Message
 }
 
 // Unwrap returns nil or the cause.
@@ -42,7 +41,7 @@ type ResourceNotFoundError struct {
 }
 
 func (e *ResourceNotFoundError) Error() string {
-	return e.Path.String()
+	return "ResourceNotFoundError: " + e.Path.String()
 }
 
 // Unwrap returns nil or the cause.
@@ -58,7 +57,7 @@ type UnsupportedAttributesError struct {
 }
 
 func (e *UnsupportedAttributesError) Error() string {
-	return fmt.Sprintf("%v", e.Data)
+	return fmt.Sprintf("UnsupportedAttributesError: %v", e.Data)
 }
 
 // Unwrap returns nil or the cause.
@@ -72,7 +71,7 @@ type CancellationError struct {
 }
 
 func (e *CancellationError) Error() string {
-	return "cancelled"
+	return "CancellationError"
 }
 
 // Unwrap returns nil or the cause.
@@ -86,7 +85,7 @@ type PermissionDeniedError struct {
 }
 
 func (e *PermissionDeniedError) Error() string {
-	return "cancelled"
+	return "PermissionDeniedError"
 }
 
 // Unwrap returns nil or the cause.
