@@ -33,6 +33,22 @@ func (e *UnsupportedOperationError) Unwrap() error {
 	return e.Cause
 }
 
+// A PathError contains information about a path
+type PathError struct {
+	Path  Path
+	Cause error
+}
+
+func (e *PathError) Error() string {
+	return "PathError: " + e.Path.String()
+}
+
+
+// Unwrap returns nil or the cause.
+func (e *PathError) Unwrap() error {
+	return e.Cause
+}
+
 // ResourceNotFoundError is always returned if a path or file is required to complete an operation but no such resource
 // is available.
 type ResourceNotFoundError struct {

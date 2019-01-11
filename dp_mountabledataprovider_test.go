@@ -10,7 +10,7 @@ func TestSimpleDelegation(t *testing.T) {
 	dp.Mount("mnt/local", fs)
 	SetDefault(dp)
 
-	infos, err := ReadDirEnt("/")
+	infos, err := ReadDir("/")
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
@@ -20,7 +20,7 @@ func TestSimpleDelegation(t *testing.T) {
 	}
 
 	//
-	infos, err = ReadDirEnt("/mnt/")
+	infos, err = ReadDir("/mnt/")
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
@@ -30,7 +30,7 @@ func TestSimpleDelegation(t *testing.T) {
 	}
 
 	//
-	infos, err = ReadDirEnt("/mnt/local")
+	infos, err = ReadDir("/mnt/local")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -65,7 +65,7 @@ func TestSimpleDelegation(t *testing.T) {
 	}
 
 	// list again
-	infos, err = ReadDirEnt("/mnt/local")
+	infos, err = ReadDir("/mnt/local")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -88,7 +88,7 @@ func TestSimpleDelegation(t *testing.T) {
 	}
 
 	// list again
-	infos, err = ReadDirEnt("/mnt/local")
+	infos, err = ReadDir("/mnt/local")
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -80,7 +80,7 @@ func generateTestSlice(len int) []byte {
 //======== our actual checks =============
 var CheckIsEmpty = &Check{
 	Test: func(dp DataProvider) error {
-		list, err := ReadDirEnt("")
+		list, err := ReadDir("")
 		if err != nil {
 			return err
 		}
@@ -95,7 +95,7 @@ var CheckIsEmpty = &Check{
 			}
 		}
 		// recheck
-		list, err = ReadDirEnt("")
+		list, err = ReadDir("")
 		if err != nil {
 			return err
 		}
@@ -115,7 +115,7 @@ var CheckCanWrite0 = &Check{
 		for _, path := range paths {
 			for _, testLen := range lengths {
 				tmp := generateTestSlice(testLen)
-				writer, err := dp.Write(path.Child(strconv.Itoa(testLen) + ".bin"))
+				writer, err := Write(path.Child(strconv.Itoa(testLen) + ".bin"))
 				if err != nil {
 					return err
 				}
@@ -144,7 +144,7 @@ var CheckCanWrite0 = &Check{
 
 var CheckReadAny = &Check{
 	Test: func(dp DataProvider) error {
-		list, err := ReadDirEntRecur("")
+		list, err := ReadDirRecur("")
 		if err != nil {
 			return err
 		}
@@ -340,26 +340,21 @@ var UnsupportedAttributes = &Check{Test: func(dp DataProvider) error {
 		return fmt.Errorf("expected UnsupportedAttributesError but got %v", err)
 	}
 
-	dir, err := dp.ReadDir("")
-	if err != nil {
-		return err
-	}
-
-	dir, err = ReadDir("")
+	dir, err := dp.ReadDir("", nil)
 	if err != nil {
 		return err
 	}
 
 	count := 0
-	err = dir.ForEach(func(scanner Scanner) error {
+	for dir.Next() {
 		mustSupport := &ResourceInfo{}
-		err = scanner.Scan(mustSupport)
+		err = dir.Scan(mustSupport)
 		if err != nil {
 			return err
 		}
 
 		mustNotSupport := &unsupportedType{}
-		err = scanner.Scan(mustNotSupport)
+		err = dir.Scan(mustNotSupport)
 		if err == nil {
 			return fmt.Errorf("reading into a generic unsupportedType{} with private members and no public fields is an error")
 		}
@@ -367,7 +362,7 @@ var UnsupportedAttributes = &Check{Test: func(dp DataProvider) error {
 			return fmt.Errorf("expected UnsupportedAttributesError but got %v", err)
 		}
 
-		err = scanner.Scan("hello world")
+		err = dir.Scan("hello world")
 		if err == nil {
 			return fmt.Errorf("reading into a value type like a string is always a programming error")
 		}
@@ -378,7 +373,8 @@ var UnsupportedAttributes = &Check{Test: func(dp DataProvider) error {
 		count++
 
 		return nil
-	})
+	}
+	err = dir.Err()
 	if err != nil {
 		return err
 	}

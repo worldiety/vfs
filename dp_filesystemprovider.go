@@ -1,7 +1,6 @@
 package vfs
 
 import (
-	"io"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -57,14 +56,13 @@ func (p *FilesystemDataProvider) MkDirs(path Path) error {
 	return os.MkdirAll(p.Resolve(path), os.ModePerm)
 }
 
-// Read details: see DataProvider#Read
-func (p *FilesystemDataProvider) Read(path Path) (io.ReadCloser, error) {
-	return os.Open(p.Resolve(path))
-}
-
-// Write details: see DataProvider#Write
-func (p *FilesystemDataProvider) Write(path Path) (io.WriteCloser, error) {
-	file, err := os.Create(p.Resolve(path))
+// Open details: see DataProvider#Open
+func (p *FilesystemDataProvider) Open(path Path, flag int, perm os.FileMode) (Resource, error) {
+	readOnly := flag&os.O_RDONLY != 0
+	if readOnly {
+		return os.OpenFile(p.Resolve(path), flag, 0)
+	}
+	file, err := os.OpenFile(p.Resolve(path), flag, perm)
 	if _, ok := err.(*os.PathError); ok {
 		//try to recreate parent folder
 		err2 := p.MkDirs(path.Parent())
@@ -73,12 +71,13 @@ func (p *FilesystemDataProvider) Write(path Path) (io.WriteCloser, error) {
 			return nil, err
 		}
 		// mkdir is fine, retry again
-		file, err = os.Create(p.Resolve(path))
+		file, err = os.OpenFile(p.Resolve(path), flag, perm)
 		if err != nil {
 			return nil, err
 		}
 	}
 	return file, nil
+
 }
 
 // Delete details: see DataProvider#Delete
@@ -109,57 +108,22 @@ func (p *FilesystemDataProvider) WriteAttrs(path Path, src interface{}) error {
 }
 
 // ReadDir details: see DataProvider#ReadDir
-func (p *FilesystemDataProvider) ReadDir(path Path) (DirEntList, error) {
+func (p *FilesystemDataProvider) ReadDir(path Path, options interface{}) (DirEntList, error) {
 	list, err := ioutil.ReadDir(p.Resolve(path))
 	if err != nil {
 		return nil, err
 	}
-	return &fileInfoDirEntList{list}, nil
+	return NewDirEntList(int64(len(list)), func(idx int64, out *ResourceInfo) error {
+		out.Name = list[int(idx)].Name()
+		out.Mode = list[int(idx)].Mode()
+		out.ModTime = list[int(idx)].ModTime().UnixNano() / 1e6
+		out.Size = list[int(idx)].Size()
+		return nil
+	}), nil
+
 }
 
-// Close does nothing
+// Close does nothing.
 func (p *FilesystemDataProvider) Close() error {
 	return nil
-}
-
-//
-type fileInfoDirEntList struct {
-	list []os.FileInfo
-}
-
-func (l *fileInfoDirEntList) ForEach(each func(scanner Scanner) error) error {
-	scanner := &fileScanner{}
-	for _, info := range l.list {
-		scanner.info = info
-		err := each(scanner)
-		if err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func (l *fileInfoDirEntList) Size() int64 {
-	return int64(len(l.list))
-}
-
-//does nothing
-func (l *fileInfoDirEntList) Close() error {
-	return nil
-}
-
-//
-type fileScanner struct {
-	info os.FileInfo
-}
-
-func (f *fileScanner) Scan(dest interface{}) error {
-	if out, ok := dest.(*ResourceInfo); ok {
-		out.Name = f.info.Name()
-		out.Mode = f.info.Mode()
-		out.ModTime = f.info.ModTime().UnixNano() / 1e6
-		out.Size = f.info.Size()
-		return nil
-	}
-	return &UnsupportedAttributesError{Data: dest}
 }

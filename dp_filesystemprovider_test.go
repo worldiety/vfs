@@ -24,7 +24,7 @@ func TestEmpty(t *testing.T) {
 	path := createTmpDir(t)
 	fs := &FilesystemDataProvider{}
 	SetDefault(fs)
-	dir, err := fs.ReadDir(path)
+	dir, err := fs.ReadDir(path, nil)
 	if err != nil {
 		t.Fatal("unexpected read failure", err)
 	}
@@ -32,7 +32,7 @@ func TestEmpty(t *testing.T) {
 		t.Fatal("expected empty dir but got", dir.Size())
 	}
 
-	infos, err := ReadDirEnt(path)
+	infos, err := ReadDir(path)
 	if err != nil {
 		t.Fatal("unexpected read failure", err)
 	}
@@ -84,7 +84,7 @@ func TestFiles(t *testing.T) {
 
 			for _, tf := range fileSet {
 				filePath := path.Child(tf.name)
-				writer, err := fs.Write(filePath)
+				writer, err := Write(filePath)
 				if err != nil {
 					t.Fatal("unexpected write failure", err)
 				}
@@ -101,7 +101,7 @@ func TestFiles(t *testing.T) {
 				}
 			}
 
-			dir, err := fs.ReadDir(path)
+			dir, err := fs.ReadDir(path, nil)
 			if err != nil {
 				t.Fatal("unexpected read failure", err)
 			}
@@ -109,7 +109,7 @@ func TestFiles(t *testing.T) {
 				t.Fatal("expected", len(fileSet), " in dir but got", dir.Size())
 			}
 
-			infos, err := ReadDirEnt(path)
+			infos, err := ReadDir(path)
 			if err != nil {
 				t.Fatal("unexpected read failure", err)
 			}
@@ -130,7 +130,7 @@ func TestFiles(t *testing.T) {
 					t.Fatal("expected not a dir", info.Mode.String())
 				}
 
-				reader, err := fs.Read(path.Child(src.name))
+				reader, err := Read(path.Child(src.name))
 				if err != nil {
 					t.Fatal("expected to read file", err)
 				}
@@ -153,7 +153,7 @@ func TestFiles(t *testing.T) {
 				}
 			}
 
-			infos, err = ReadDirEnt(path)
+			infos, err = ReadDir(path)
 			if err != nil {
 				t.Fatal("unexpected read failure", err)
 			}

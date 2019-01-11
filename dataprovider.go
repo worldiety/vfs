@@ -6,6 +6,34 @@ import (
 	"os"
 )
 
+// A Resource is an abstract accessor to read or write bytes. In general, not all methods are supported, either
+// due to the way the resources have been opened or because of the underlying implementation. In such cases
+// the affected method will always return an *UnsupportedOperationError.
+type Resource interface {
+	// ReadAt reads len(b) bytes from the File starting at byte offset off. It returns the number of bytes read and
+	// the error, if any. ReadAt always returns a non-nil error when n < len(b). At end of file, that error is io.EOF.
+	//
+	// This method is explicitly thread safe, as long no overlapping
+	// writes or reads to the given offset are happening. This is
+	// especially useful in multi threaded scenarios to perform
+	// concurrent changes on a single opened resource (see POSIX pread).
+	ReadAt(b []byte, off int64) (n int, err error)
+	io.Reader
+
+	// WriteAt writes len(b) bytes to the File starting at byte offset off.
+	// It returns the number of bytes written and an error, if any.
+	// WriteAt returns a non-nil error when n != len(b).
+	//
+	// This method is explicitly thread safe, as long no overlapping
+	// writes or reads to the given offset are happening. This is
+	// especially useful in multi threaded scenarios to perform
+	// concurrent changes on a single opened resource (see POSIX pwrite).
+	WriteAt(b []byte, off int64) (n int, err error)
+	io.Writer
+	io.Seeker
+	io.Closer
+}
+
 // The DataProvider interface is the core contract to provide access to hierarchical structures using a compound
 // key logic. This is an abstract of way of the design thinking behind a filesystem.
 //
@@ -27,53 +55,58 @@ import (
 //    implementation should be as thread safe as possible, similar to the POSIX filesystem specification.
 //
 type DataProvider interface {
-	// Opens the given resource for reading. May optionally also implement os.Seeker. If called on a directory
-	// UnsupportedOperationError is returned.
-	Read(path Path) (io.ReadCloser, error)
-
-	// Opens the given resource for writing. Removes and recreates the file. May optionally also implement os.Seeker.
-	// If elements of the path do not exist, they are created implicitly.
-	Write(path Path) (io.WriteCloser, error)
+	// Open is the general read or write call. It opens the named resource with specified flags (O_RDONLY etc.)
+	// and perm (before umask), if applicable.
+	// If successful, methods on the returned File can be used for I/O.
+	// If there is an error, the trace will also contain a *PathError.
+	// Implementations have to create parent directories, if those do not exist. However if any existing
+	// path segment denotes already a resource, the resource is not deleted and an error is returned instead.
+	Open(path Path, flag int, perm os.FileMode) (Resource, error)
 
 	// Deletes a path entry and all contained children. It is not considered an error to delete a non-existing resource.
 	Delete(path Path) error
 
-	// Reads Attributes. Every implementation must support ResourceInfo
+	// Reads Attributes. Every implementation must support *ResourceInfo
 	ReadAttrs(path Path, dest interface{}) error
 
 	// Writes Attributes. This is an optional implementation and may simply return UnsupportedOperationError.
 	WriteAttrs(path Path, src interface{}) error
 
-	// Reads the contents of a directory.
-	ReadDir(path Path) (DirEntList, error)
+	// ReadDir reads the contents of a directory. If path is not a directory, a ResourceNotFoundError is returned.
+	// options can be arbitrary and at least nil options must be supported, otherwise unsupported abstraction will
+	// cause an *UnsupportedAttributesError to be returned. Using the options, the query to
+	// retrieve the directory contents can be optimized, like required fields, sorting, page size, filter etc.
+	ReadDir(path Path, options interface{}) (DirEntList, error)
 
 	// Tries to create the given path hierarchy. If path already denotes a directory nothing happens. If any path
-	// segment already refers a file, an error must be returned.
+	// segment already refers a resource, an error must be returned.
 	MkDirs(path Path) error
 
 	// Rename moves a file from the old to the new path. If oldPath does not exist, ResourceNotFoundError is returned.
 	// If newPath exists, it will be replaced.
 	Rename(oldPath Path, newPath Path) error
 
-	// Please close when Done
+	// Close when Done to release resources
 	io.Closer
 }
 
-// The Scanner contract is used to populate a pointer to a struct to get specific meta data out of an
-// entry.
-type Scanner interface {
-	// Scan supports at least data into *ResourceInfo. Especially it is not guaranteed to fill or map into unknown
+// A DirEntList is a collection of (potentially lazy loaded) directory entries.
+// E.g. the entire query may be even delayed until the first next call.
+type DirEntList interface {
+	// Next prepares the next directory entry for reading with the Scan method.
+	// It returns true on success, or false if there is no next entry or an error happened while preparing it.
+	// Err should be consulted to distinguish between the two cases.
+
+	// Every call to Scan, even the first one, must be preceded by a call to Next.
+	Next() bool
+
+	// Err returns the first error, if any, that was encountered during iteration.
+	Err() error
+
+	// Scan supports at least reading data into *ResourceInfo.
+	// Especially it is not guaranteed to fill or map into unknown
 	// structs even if the field structure is identical.
 	Scan(dest interface{}) error
-}
-
-// A DirEntList is a collection of (potentially lazy loaded) directory entries.
-// E.g. the entire query may be even delayed until the first ForEach query, so that the scanner takes the given
-// type and optimizes its remote query (e.g. by including or excluding required fields).
-type DirEntList interface {
-	// Loops over the result set and is invoked for each entry. The loop is cancelled as soon as the each closure
-	// returns a non-nil error, which is simply returned.
-	ForEach(each func(scanner Scanner) error) error
 
 	// Estimated amount of entries. Is -1 if unknown and you definitely have to use ForEach to collect the result.
 	// However in the meantime, Size may deliver a more correct estimation.

@@ -1,7 +1,6 @@
 package vfs
 
 import (
-	"io"
 	"os"
 )
 
@@ -52,6 +51,15 @@ func (d *virtualDir) RemoveChild(name string) *namedEntry {
 // If you have /my/dir/provider0 and mount /my/dir/provider0/some/dir/provider1 the existing provider0 will be removed.
 type MountableDataProvider struct {
 	root *virtualDir
+}
+
+// Open details: see DataProvider#Open
+func (p *MountableDataProvider) Open(path Path, flag int, perm os.FileMode) (Resource, error) {
+	_, providerPath, dp := p.Resolve(path)
+	if dp != nil {
+		return dp.Open(providerPath, flag, perm)
+	}
+	return nil, &MountPointNotFoundError{}
 }
 
 // Rename details: see DataProvider#Rename
@@ -162,16 +170,16 @@ func (p *MountableDataProvider) WriteAttrs(path Path, src interface{}) error {
 }
 
 // ReadDir either dispatches as expected or the virtual directories. See also DataProvider#ReadDir
-func (p *MountableDataProvider) ReadDir(path Path) (DirEntList, error) {
+func (p *MountableDataProvider) ReadDir(path Path, options interface{}) (DirEntList, error) {
 	_, providerPath, dp := p.Resolve(path)
 	if dp != nil {
-		return dp.ReadDir(providerPath)
+		return dp.ReadDir(providerPath, options)
 	}
 	//just try to walk
 	parent := p.getRoot()
 	names := path.Names()
 	if len(names) == 0 {
-		return &virtualDirEntList{p.root}, nil
+		return asDirEntList(p.root), nil
 	}
 	var child *namedEntry
 	for _, name := range names {
@@ -183,26 +191,10 @@ func (p *MountableDataProvider) ReadDir(path Path) (DirEntList, error) {
 		}
 	}
 	if vdir, ok := child.data.(*virtualDir); ok {
-		return &virtualDirEntList{vdir}, nil
+		return asDirEntList(vdir), nil
 	}
 	panic("implementation failure")
 
-}
-
-func (p *MountableDataProvider) Read(path Path) (io.ReadCloser, error) {
-	_, providerPath, dp := p.Resolve(path)
-	if dp != nil {
-		return dp.Read(providerPath)
-	}
-	return nil, &MountPointNotFoundError{}
-}
-
-func (p *MountableDataProvider) Write(path Path) (io.WriteCloser, error) {
-	_, providerPath, dp := p.Resolve(path)
-	if dp != nil {
-		return dp.Write(providerPath)
-	}
-	return nil, &MountPointNotFoundError{}
 }
 
 // Delete dispatches as expected or removes a mount point. See DataProvider#Delete
@@ -234,41 +226,12 @@ func (p *MountableDataProvider) Delete(path Path) error {
 	return nil
 }
 
-type virtualDirEntList struct {
-	parent *virtualDir
-}
-
-func (v *virtualDirEntList) ForEach(each func(scanner Scanner) error) error {
-	tmp := &entScanner{}
-	for _, ent := range v.parent.children {
-		tmp.entry = ent
-		err := each(tmp)
-		if err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func (v *virtualDirEntList) Size() int64 {
-	return int64(len(v.parent.children))
-}
-
-func (v *virtualDirEntList) Close() error {
-	return nil
-}
-
-type entScanner struct {
-	entry *namedEntry
-}
-
-func (s *entScanner) Scan(dest interface{}) error {
-	if info, ok := dest.(*ResourceInfo); ok {
-		info.Size = 0
-		info.Mode = os.ModeDir
-		info.Name = s.entry.name
+func asDirEntList(parent *virtualDir) DirEntList {
+	return NewDirEntList(int64(len(parent.children)), func(idx int64, dst *ResourceInfo) error {
+		child := parent.children[int(idx)]
+		dst.Size = 0
+		dst.Mode = os.ModeDir
+		dst.Name = child.name
 		return nil
-	}
-	return &UnsupportedAttributesError{Data: dest}
-
+	})
 }

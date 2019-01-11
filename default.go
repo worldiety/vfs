@@ -5,12 +5,13 @@ import (
 	"fmt"
 	"io"
 	"math"
+	"os"
 	"sync/atomic"
 )
 
 var prov DataProvider = &FilesystemDataProvider{}
 
-// Default returns the root data provider. By default it is a vfs.FilesystemDataProvider. Consider to reconfigure it to
+// Default returns the root data provider. By default this is a vfs.FilesystemDataProvider. Consider to reconfigure it to
 // a vfs.MountableDataProvider which allows arbitrary prefixes (also called mount points). Use it to configure and setup
 // a virtualized filesystem structure for your app.
 //
@@ -34,15 +35,15 @@ func SetDefault(provider DataProvider) {
 }
 
 // Read opens the given resource for reading. May optionally also implement os.Seeker. If called on a directory
-// UnsupportedOperationError is returned. Delegates to Default()#Read.
-func Read(path Path) (io.ReadCloser, error) {
-	return Default().Read(path)
+// UnsupportedOperationError is returned. Delegates to Default()#Open.
+func Read(path Path) (Resource, error) {
+	return Default().Open(path, os.O_RDONLY, 0)
 }
 
 // Write opens the given resource for writing. Removes and recreates the file. May optionally also implement os.Seeker.
-// If elements of the path do not exist, they are created implicitly. Delegates to Default()#Write.
-func Write(path Path) (io.WriteCloser, error) {
-	return Default().Write(path)
+// If elements of the path do not exist, they are created implicitly. Delegates to Default()#Open.
+func Write(path Path) (Resource, error) {
+	return Default().Open(path, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0666)
 }
 
 // Delete a path entry and all contained children. It is not considered an error to delete a non-existing resource.
@@ -62,11 +63,6 @@ func WriteAttrs(path Path, src interface{}) error {
 	return Default().WriteAttrs(path, src)
 }
 
-// ReadDir reads the contents of a directory. Delegates to Default()#ReadDir.
-func ReadDir(path Path) (DirEntList, error) {
-	return Default().ReadDir(path)
-}
-
 // MkDirs tries to create the given path hierarchy. If path already denotes a directory nothing happens. If any path
 // segment already refers a file, an error must be returned. Delegates to Default()#MkDirs.
 func MkDirs(path Path) error {
@@ -79,10 +75,10 @@ func Rename(oldPath Path, newPath Path) error {
 	return Default().Rename(oldPath, newPath)
 }
 
-// ReadDirEnt is utility method to simply list a directory listing as ResourceInfo, which is supported by all
+// ReadDir is utility method to simply list a directory listing as *ResourceInfo, which is supported by all
 // DataProviders.
-func ReadDirEnt(path Path) ([]*ResourceInfo, error) {
-	res, err := Default().ReadDir(path)
+func ReadDir(path Path) ([]*ResourceInfo, error) {
+	res, err := Default().ReadDir(path, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -95,24 +91,19 @@ func ReadDirEnt(path Path) ([]*ResourceInfo, error) {
 		expectedEntries = int(res.Size())
 	}
 	list := make([]*ResourceInfo, expectedEntries)[0:0]
-	err = res.ForEach(func(scanner Scanner) error {
+	for res.Next() {
 		row := &ResourceInfo{}
-		err = scanner.Scan(row)
+		err = res.Scan(row)
 		if err != nil {
-			return err
+			return list, err
 		}
 		list = append(list, row)
-		return nil
-	})
-
-	if err != nil {
-		return list, err
 	}
-	return list, nil
+	return list, res.Err()
 }
 
-// ReadDirEntRecur fully reads the given directory recursively and returns entries with full qualified paths.
-func ReadDirEntRecur(path Path) ([]*PathEntry, error) {
+// ReadDirRecur fully reads the given directory recursively and returns entries with full qualified paths.
+func ReadDirRecur(path Path) ([]*PathEntry, error) {
 	res := make([]*PathEntry, 0)
 	err := Walk(path, func(path Path, info *ResourceInfo, err error) error {
 		if err != nil {
@@ -132,14 +123,14 @@ type WalkClosure func(path Path, info *ResourceInfo, err error) error
 
 // Walk recursively goes down the entire path hierarchy starting at the given path
 func Walk(path Path, each WalkClosure) error {
-	res, err := Default().ReadDir(path)
+	res, err := Default().ReadDir(path, nil)
 	if err != nil {
 		return err
 	}
 
-	err = res.ForEach(func(scanner Scanner) error {
+	for res.Next() {
 		tmp := &ResourceInfo{}
-		err := scanner.Scan(tmp)
+		err := res.Scan(tmp)
 		if err != nil {
 			// the dev may decide to ignore errors and continue walking, e.g. due to permission denied
 			shouldBreak := each(path, nil, err)
@@ -152,13 +143,16 @@ func Walk(path Path, each WalkClosure) error {
 
 		//delegate call
 		err = each(path.Child(tmp.Name), tmp, nil)
+		if err != nil {
+			return err
+		}
 
 		if tmp.Mode.IsDir() {
 			return Walk(path.Child(tmp.Name), each)
 		}
 		return nil
-	})
-	return err
+	}
+	return res.Err()
 }
 
 // A PathEntry simply provides a Path and the related ResourceInfo
@@ -180,7 +174,7 @@ func (e *PathEntry) Equals(other interface{}) bool {
 
 // ReadAll loads the entire resource into memory. Only use it, if you know that it fits into memory
 func ReadAll(path Path) ([]byte, error) {
-	reader, err := Default().Read(path)
+	reader, err := Read(path)
 	if err != nil {
 		return nil, err
 	}
@@ -197,7 +191,7 @@ func ReadAll(path Path) ([]byte, error) {
 
 // WriteAll just puts the given data into the path
 func WriteAll(path Path, data []byte) (int, error) {
-	writer, err := Default().Write(path)
+	writer, err := Write(path)
 	if err != nil {
 		return 0, err
 	}
@@ -368,26 +362,27 @@ func Copy(src Path, dst Path, options *CopyOptions) error {
 			}
 		}
 		return nil
-	} else {
-		options.onScan(src, 1, info.Size)
-		//just copy file
-		reader, err := Read(src)
-		if err != nil {
-			return err
-		}
-		defer silentClose(reader)
-		writer, err := Write(dst)
-		if err != nil {
-			return err
-		}
-		defer silentClose(writer)
-		written, err := copyBuffer(src, dst, info.Size, reader, writer, nil, options)
-		if err != nil {
-			return err
-		}
-		options.onCopied(src, 1, written)
-		return nil
 	}
+
+	options.onScan(src, 1, info.Size)
+	//just copy file
+	reader, err := Read(src)
+	if err != nil {
+		return err
+	}
+	defer silentClose(reader)
+	writer, err := Write(dst)
+	if err != nil {
+		return err
+	}
+	defer silentClose(writer)
+	written, err := copyBuffer(src, dst, info.Size, reader, writer, nil, options)
+	if err != nil {
+		return err
+	}
+	options.onCopied(src, 1, written)
+	return nil
+
 }
 
 func copyBuffer(srcPath Path, dstPath Path, totalSize int64, src io.Reader, dst io.Writer, buf []byte, options *CopyOptions) (written int64, err error) {
@@ -425,4 +420,46 @@ func copyBuffer(srcPath Path, dstPath Path, totalSize int64, src io.Reader, dst 
 		}
 	}
 	return written, err
+}
+
+// A genericDirEntList is a simple implementation for fixed size result sets providing only *ResourceInfo targets.
+type genericDirEntList struct {
+	currentIdx int64
+	count      int64
+	getAt      func(idx int64, dst *ResourceInfo) error
+}
+
+func (d *genericDirEntList) Next() bool {
+	if d.currentIdx < d.count {
+		d.currentIdx++
+	}
+	return d.currentIdx < d.count
+}
+
+// Err never returns an error, because the count is known at construction time, and seeking errors cannot occur.
+func (d *genericDirEntList) Err() error {
+	return nil
+}
+
+func (d *genericDirEntList) Scan(dest interface{}) error {
+	if out, ok := dest.(*ResourceInfo); ok {
+		if d.currentIdx >= d.count {
+			return d.getAt(d.count-1, out)
+		}
+		return d.getAt(d.currentIdx, out)
+	}
+	return &UnsupportedAttributesError{dest, nil}
+}
+
+func (d *genericDirEntList) Size() int64 {
+	return d.count
+}
+
+func (d *genericDirEntList) Close() error {
+	return nil
+}
+
+// NewDirEntList is a utility function to simply wrap a function into a lazy DirEntList implementation
+func NewDirEntList(size int64, getter func(idx int64, dst *ResourceInfo) error) DirEntList {
+	return &genericDirEntList{0, size, getter}
 }
