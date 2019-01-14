@@ -22,7 +22,7 @@ func createTmpDir(t *testing.T) Path {
 
 func TestEmpty(t *testing.T) {
 	path := createTmpDir(t)
-	fs := &FilesystemDataProvider{}
+	fs := &LocalFileSystem{}
 	SetDefault(fs)
 	dir, err := fs.ReadDir(path, nil)
 	if err != nil {
@@ -43,7 +43,7 @@ func TestEmpty(t *testing.T) {
 
 func TestCTS(t *testing.T) {
 	path := createTmpDir(t)
-	fs := &FilesystemDataProvider{Prefix: path.String()}
+	fs := &ChRoot{Delegate: &LocalFileSystem{}, Prefix: path}
 
 	cts := &CTS{}
 	cts.All()
@@ -70,15 +70,15 @@ func TestFiles(t *testing.T) {
 	for _, mode := range modes {
 		for _, fileSet := range fileSets {
 			var path Path
-			var fs *FilesystemDataProvider
+			var fs FileSystem
 			switch mode {
 			case testModeNormal:
 				path = createTmpDir(t)
-				fs = &FilesystemDataProvider{}
+				fs = &LocalFileSystem{}
 			case testModePrefix:
 				absPath := createTmpDir(t)
 				path = ""
-				fs = &FilesystemDataProvider{Prefix: absPath.String()}
+				fs = &ChRoot{Delegate: &LocalFileSystem{}, Prefix: absPath}
 			}
 			SetDefault(fs)
 

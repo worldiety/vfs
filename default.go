@@ -9,9 +9,9 @@ import (
 	"sync/atomic"
 )
 
-var prov FileSystem = &FilesystemDataProvider{}
+var prov FileSystem = &LocalFileSystem{}
 
-// Default returns the root data provider. By default this is a vfs.FilesystemDataProvider. Consider to reconfigure it to
+// Default returns the root data provider. By default this is a vfs.LocalFileSystem. Consider to reconfigure it to
 // a vfs.MountableFileSystem which allows arbitrary prefixes (also called mount points). Use it to configure and setup
 // a virtualized filesystem structure for your app.
 //

@@ -146,6 +146,11 @@ func (p Path) Normalize() Path {
 	return Path("/" + strings.Join(tmp, "/"))
 }
 
+// Add returns this path concated with the given path. Sadly we have no overloading operator.
+func (p Path) Add(path Path) Path {
+	return ConcatPaths(p, path)
+}
+
 // ConcatPaths merges all paths together
 func ConcatPaths(paths ...Path) Path {
 	tmp := make([]string, 0)

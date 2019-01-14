@@ -4,35 +4,23 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
-	"runtime"
 )
 
-var _ FileSystem = (*FilesystemDataProvider)(nil)
+var _ FileSystem = (*LocalFileSystem)(nil)
 
-// A FilesystemDataProvider just works with the local filesystem and optionally supports a local filename prefix, e.g.
-// to just provide a subset instead of the entire root. See also Resolve.
-type FilesystemDataProvider struct {
-	// The Prefix is always added to any given path, so you can create artificial roots.
-	Prefix string
+// A LocalFileSystem just works with the local filesystem.
+type LocalFileSystem struct {
 }
 
 // Resolve creates a platform specific filename from the given invariant path by adding the Prefix and using
 // the platform specific name separator. If AllowRelativePaths is false (default), .. will be silently ignored.
-func (p *FilesystemDataProvider) Resolve(path Path) string {
-	if len(p.Prefix) == 0 {
-		if runtime.GOOS == "windows" {
-			return filepath.Join(path.Names()...)
-		}
-		return path.String()
-
-	}
-	// security feature: we normalize our path, before adding the prefix to avoid breaking out of our root
-	path = path.Normalize()
-	return filepath.Join(p.Prefix, filepath.Join(path.Names()...))
+func (p *LocalFileSystem) Resolve(path Path) string {
+	//TODO what about windows? Does \c:\a\b work?
+	return string(filepath.Separator) + filepath.Join(path.Names()...)
 }
 
 // Rename details: see FileSystem#Rename
-func (p *FilesystemDataProvider) Rename(oldPath Path, newPath Path) error {
+func (p *LocalFileSystem) Rename(oldPath Path, newPath Path) error {
 	err := os.Rename(p.Resolve(oldPath), p.Resolve(newPath))
 	if err != nil {
 		//perhaps the backend does not support the rename if target already exists
@@ -52,12 +40,12 @@ func (p *FilesystemDataProvider) Rename(oldPath Path, newPath Path) error {
 }
 
 // MkDirs details: see FileSystem#MkDirs
-func (p *FilesystemDataProvider) MkDirs(path Path) error {
+func (p *LocalFileSystem) MkDirs(path Path) error {
 	return os.MkdirAll(p.Resolve(path), os.ModePerm)
 }
 
 // Open details: see FileSystem#Open
-func (p *FilesystemDataProvider) Open(path Path, flag int, perm os.FileMode) (Resource, error) {
+func (p *LocalFileSystem) Open(path Path, flag int, perm os.FileMode) (Resource, error) {
 	readOnly := flag&os.O_RDONLY != 0
 	if readOnly {
 		return os.OpenFile(p.Resolve(path), flag, 0)
@@ -81,12 +69,12 @@ func (p *FilesystemDataProvider) Open(path Path, flag int, perm os.FileMode) (Re
 }
 
 // Delete details: see FileSystem#Delete
-func (p *FilesystemDataProvider) Delete(path Path) error {
+func (p *LocalFileSystem) Delete(path Path) error {
 	return os.RemoveAll(p.Resolve(path))
 }
 
 // ReadAttrs details: see FileSystem#ReadAttrs
-func (p *FilesystemDataProvider) ReadAttrs(path Path, dest interface{}) error {
+func (p *LocalFileSystem) ReadAttrs(path Path, dest interface{}) error {
 	if out, ok := dest.(*ResourceInfo); ok {
 		info, err := os.Stat(p.Resolve(path))
 		if err != nil {
@@ -103,12 +91,12 @@ func (p *FilesystemDataProvider) ReadAttrs(path Path, dest interface{}) error {
 }
 
 // WriteAttrs details: see FileSystem#WriteAttrs
-func (p *FilesystemDataProvider) WriteAttrs(path Path, src interface{}) error {
+func (p *LocalFileSystem) WriteAttrs(path Path, src interface{}) error {
 	return &UnsupportedOperationError{Message: "WriteAttrs"}
 }
 
 // ReadDir details: see FileSystem#ReadDir
-func (p *FilesystemDataProvider) ReadDir(path Path, options interface{}) (DirEntList, error) {
+func (p *LocalFileSystem) ReadDir(path Path, options interface{}) (DirEntList, error) {
 	list, err := ioutil.ReadDir(p.Resolve(path))
 	if err != nil {
 		return nil, err
@@ -124,6 +112,6 @@ func (p *FilesystemDataProvider) ReadDir(path Path, options interface{}) (DirEnt
 }
 
 // Close does nothing.
-func (p *FilesystemDataProvider) Close() error {
+func (p *LocalFileSystem) Close() error {
 	return nil
 }

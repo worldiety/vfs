@@ -4,7 +4,7 @@ import "testing"
 
 func TestSimpleDelegation(t *testing.T) {
 	path := createTmpDir(t)
-	fs := &FilesystemDataProvider{Prefix: path.String()}
+	fs := &ChRoot{Delegate: &LocalFileSystem{}, Prefix: path}
 
 	dp := &MountableFileSystem{}
 	dp.Mount("mnt/local", fs)
