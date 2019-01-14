@@ -8,9 +8,9 @@ import (
 	"strings"
 )
 
-// A Check tells if a DataProvider has a specific property or not
+// A Check tells if a FileSystem has a specific property or not
 type Check struct {
-	Test        func(dp DataProvider) error
+	Test        func(dp FileSystem) error
 	Name        string
 	Description string
 }
@@ -59,7 +59,7 @@ func (t *CTS) All() {
 	}
 }
 
-func (t *CTS) Run(dp DataProvider) CTSResult {
+func (t *CTS) Run(dp FileSystem) CTSResult {
 	res := make([]*CheckResult, 0)
 	for _, check := range t.checks {
 		SetDefault(dp)
@@ -79,7 +79,7 @@ func generateTestSlice(len int) []byte {
 
 //======== our actual checks =============
 var CheckIsEmpty = &Check{
-	Test: func(dp DataProvider) error {
+	Test: func(dp FileSystem) error {
 		list, err := ReadDir("")
 		if err != nil {
 			return err
@@ -102,14 +102,14 @@ var CheckIsEmpty = &Check{
 		if len(list) == 0 {
 			return nil
 		}
-		return fmt.Errorf("DataProvider is not empty and cannot clear it")
+		return fmt.Errorf("FileSystem is not empty and cannot clear it")
 	},
 	Name:        "Empty",
-	Description: "Checks the corner case of an empty DataProvider",
+	Description: "Checks the corner case of an empty FileSystem",
 }
 
 var CheckCanWrite0 = &Check{
-	Test: func(dp DataProvider) error {
+	Test: func(dp FileSystem) error {
 		paths := []Path{"", "/", "/canWrite0", "/canWrite0/subfolder", "canWrite0_1/subfolder1/subfolder2"}
 		lengths := []int{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 512, 1024, 4096, 4097, 8192, 8193}
 		for _, path := range paths {
@@ -143,7 +143,7 @@ var CheckCanWrite0 = &Check{
 }
 
 var CheckReadAny = &Check{
-	Test: func(dp DataProvider) error {
+	Test: func(dp FileSystem) error {
 		list, err := ReadDirRecur("")
 		if err != nil {
 			return err
@@ -171,7 +171,7 @@ var CheckReadAny = &Check{
 }
 
 var CheckWriteAndRead = &Check{
-	Test: func(dp DataProvider) error {
+	Test: func(dp FileSystem) error {
 		paths := []Path{"", "/", "/canWrite1", "/canWrite1/subfolder", "canWrite1_1/subfolder1/subfolder2"}
 		lengths := []int{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 512, 1024, 4096, 4097, 8192, 8193, 128 * 1024 * 3}
 		for _, path := range paths {
@@ -239,7 +239,7 @@ var CheckWriteAndRead = &Check{
 }
 
 var CheckRename = &Check{
-	Test: func(dp DataProvider) error {
+	Test: func(dp FileSystem) error {
 		a := Path("/a.bin")
 		b := Path("/b.bin")
 
@@ -311,7 +311,7 @@ var CheckRename = &Check{
 	Description: "Renames and their corner cases",
 }
 
-var UnsupportedAttributes = &Check{Test: func(dp DataProvider) error {
+var UnsupportedAttributes = &Check{Test: func(dp FileSystem) error {
 	c := Path("/c.bin")
 	_, err := WriteAll(c, generateTestSlice(13))
 	if err != nil {
@@ -407,7 +407,7 @@ type unsupportedType struct {
 }
 
 var CloseProvider = &Check{
-	Test: func(dp DataProvider) error {
+	Test: func(dp FileSystem) error {
 		err := dp.Close()
 		if err != nil {
 			return err
@@ -416,5 +416,5 @@ var CloseProvider = &Check{
 		return nil
 	},
 	Name:        "Close",
-	Description: "Simply checks if close succeeds. It does not mean that the DataProvider is unusable, because some are stateless",
+	Description: "Simply checks if close succeeds. It does not mean that the FileSystem is unusable, because some are stateless",
 }

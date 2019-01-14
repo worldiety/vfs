@@ -1,4 +1,4 @@
-//Package vfs provides the API and basic tools for data providers, also known as virtual filesystems.
+//Package vfs provides the API and basic tools for virtual filesystems.
 package vfs
 
 import (
@@ -34,7 +34,7 @@ type Resource interface {
 	io.Closer
 }
 
-// The DataProvider interface is the core contract to provide access to hierarchical structures using a compound
+// The FileSystem interface is the core contract to provide access to hierarchical structures using a compound
 // key logic. This is an abstract of way of the design thinking behind a filesystem.
 //
 // Design decisions
@@ -49,18 +49,25 @@ type Resource interface {
 //    their permission handling.
 //
 //  * Most implementations do not provide a transactional contract, which is represented through the optional
-//    TransactionableDataProvider.
+//    TransactionableFileSystem.
 //
-//  * It is not specified, if a DataProvider is thread safe. However every
+//  * It is not specified, if a FileSystem is thread safe. However every
 //    implementation should be as thread safe as possible, similar to the POSIX filesystem specification.
 //
-type DataProvider interface {
+type FileSystem interface {
 	// Open is the general read or write call. It opens the named resource with specified flags (O_RDONLY etc.)
 	// and perm (before umask), if applicable.
 	// If successful, methods on the returned File can be used for I/O.
 	// If there is an error, the trace will also contain a *PathError.
 	// Implementations have to create parent directories, if those do not exist. However if any existing
 	// path segment denotes already a resource, the resource is not deleted and an error is returned instead.
+	//
+	// Resource Forks or Alternate Data Streams (or e.g. thumbnails from online resources) should be simply addressed
+	// using a /. Example: /myfolder/test.png/thumb-jpg/720p. Note that this is path wise basically indistinguishable
+	// from a folder and a regular file name (which is logically correct).
+	// To make your lookups easier, you may use some kind of magic identifier
+	// like rsc or $<some id> but you should generally avoid : as used by windows because it breaks
+	// the entire path semantics and conflicts with the Unix path separator.
 	Open(path Path, flag int, perm os.FileMode) (Resource, error)
 
 	// Deletes a path entry and all contained children. It is not considered an error to delete a non-existing resource.
@@ -75,7 +82,9 @@ type DataProvider interface {
 	// ReadDir reads the contents of a directory. If path is not a directory, a ResourceNotFoundError is returned.
 	// options can be arbitrary and at least nil options must be supported, otherwise unsupported abstraction will
 	// cause an *UnsupportedAttributesError to be returned. Using the options, the query to
-	// retrieve the directory contents can be optimized, like required fields, sorting, page size, filter etc.
+	// retrieve the directory contents can be optimized, like required fields, sorting, page size, filter etc. This
+	// is especially important for online sources, because it also allows arbitrary queries, which are not
+	// related to a path hierarchy at all.
 	ReadDir(path Path, options interface{}) (DirEntList, error)
 
 	// Tries to create the given path hierarchy. If path already denotes a directory nothing happens. If any path

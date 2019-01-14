@@ -9,10 +9,10 @@ import (
 	"sync/atomic"
 )
 
-var prov DataProvider = &FilesystemDataProvider{}
+var prov FileSystem = &FilesystemDataProvider{}
 
 // Default returns the root data provider. By default this is a vfs.FilesystemDataProvider. Consider to reconfigure it to
-// a vfs.MountableDataProvider which allows arbitrary prefixes (also called mount points). Use it to configure and setup
+// a vfs.MountableFileSystem which allows arbitrary prefixes (also called mount points). Use it to configure and setup
 // a virtualized filesystem structure for your app.
 //
 // Best practice
@@ -25,12 +25,12 @@ var prov DataProvider = &FilesystemDataProvider{}
 //  * Mount your user specific data into something like /media/local and
 //    /media/ftp and /media/gphotos etc.
 //
-func Default() DataProvider {
+func Default() FileSystem {
 	return prov
 }
 
 // SetDefault updates the default data provider. See also #Default()
-func SetDefault(provider DataProvider) {
+func SetDefault(provider FileSystem) {
 	prov = provider
 }
 
@@ -328,9 +328,7 @@ func Copy(src Path, dst Path, options *CopyOptions) error {
 				}
 				objectsProcessed++
 				options.onCopied(entry.Path, objectsProcessed, bytesProcessed)
-			} else
-
-			if entry.Resource.Mode.IsRegular() {
+			} else if entry.Resource.Mode.IsRegular() {
 				reader, err := Read(entry.Path)
 				if err != nil {
 					return err
@@ -432,8 +430,9 @@ type genericDirEntList struct {
 func (d *genericDirEntList) Next() bool {
 	if d.currentIdx < d.count {
 		d.currentIdx++
+		return true
 	}
-	return d.currentIdx < d.count
+	return false
 }
 
 // Err never returns an error, because the count is known at construction time, and seeking errors cannot occur.
@@ -446,7 +445,7 @@ func (d *genericDirEntList) Scan(dest interface{}) error {
 		if d.currentIdx >= d.count {
 			return d.getAt(d.count-1, out)
 		}
-		return d.getAt(d.currentIdx, out)
+		return d.getAt(d.currentIdx-1, out)
 	}
 	return &UnsupportedAttributesError{dest, nil}
 }

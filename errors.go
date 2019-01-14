@@ -2,8 +2,8 @@ package vfs
 
 import "fmt"
 
-// A MountPointNotFoundError is only used by the MountableDataProvider to indicate that the given path cannot be
-// associated with a mounted DataProvider. Check your prefix.
+// A MountPointNotFoundError is only used by the MountableFileSystem to indicate that the given path cannot be
+// associated with a mounted FileSystem. Check your prefix.
 type MountPointNotFoundError struct {
 	MountPoint string
 	Cause      error
@@ -43,7 +43,6 @@ func (e *PathError) Error() string {
 	return "PathError: " + e.Path.String()
 }
 
-
 // Unwrap returns nil or the cause.
 func (e *PathError) Unwrap() error {
 	return e.Cause
@@ -65,8 +64,8 @@ func (e *ResourceNotFoundError) Unwrap() error {
 	return e.Cause
 }
 
-// UnsupportedAttributesError is returned by DataProvider#ReadAttrs and DataProvider#WriteAttrs whenever a type
-// has been given which is not supported by the actual DataProvider implementation.
+// UnsupportedAttributesError is returned by FileSystem#ReadAttrs and FileSystem#WriteAttrs whenever a type
+// has been given which is not supported by the actual FileSystem implementation.
 type UnsupportedAttributesError struct {
 	Data  interface{}
 	Cause error

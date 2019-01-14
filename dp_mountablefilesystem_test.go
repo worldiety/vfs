@@ -6,7 +6,7 @@ func TestSimpleDelegation(t *testing.T) {
 	path := createTmpDir(t)
 	fs := &FilesystemDataProvider{Prefix: path.String()}
 
-	dp := &MountableDataProvider{}
+	dp := &MountableFileSystem{}
 	dp.Mount("mnt/local", fs)
 	SetDefault(dp)
 

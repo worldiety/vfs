@@ -4,7 +4,7 @@ import (
 	"os"
 )
 
-var _ DataProvider = (*MountableDataProvider)(nil)
+var _ FileSystem = (*MountableFileSystem)(nil)
 
 type virtualDir struct {
 	children []*namedEntry
@@ -12,7 +12,7 @@ type virtualDir struct {
 
 type namedEntry struct {
 	name string
-	// either a *virtualEntry or a DataProvider
+	// either a *virtualEntry or a FileSystem
 	data interface{}
 }
 
@@ -43,18 +43,18 @@ func (d *virtualDir) RemoveChild(name string) *namedEntry {
 	return c
 }
 
-// A MountableDataProvider contains only other DataProviders mounted under a path. Mounting cross paths is not
+// A MountableFileSystem contains only other DataProviders mounted under a path. Mounting cross paths is not
 // supported.
 //
 // Example
 //
 // If you have /my/dir/provider0 and mount /my/dir/provider0/some/dir/provider1 the existing provider0 will be removed.
-type MountableDataProvider struct {
+type MountableFileSystem struct {
 	root *virtualDir
 }
 
-// Open details: see DataProvider#Open
-func (p *MountableDataProvider) Open(path Path, flag int, perm os.FileMode) (Resource, error) {
+// Open details: see FileSystem#Open
+func (p *MountableFileSystem) Open(path Path, flag int, perm os.FileMode) (Resource, error) {
 	_, providerPath, dp := p.Resolve(path)
 	if dp != nil {
 		return dp.Open(providerPath, flag, perm)
@@ -62,8 +62,8 @@ func (p *MountableDataProvider) Open(path Path, flag int, perm os.FileMode) (Res
 	return nil, &MountPointNotFoundError{}
 }
 
-// Rename details: see DataProvider#Rename
-func (p *MountableDataProvider) Rename(oldPath Path, newPath Path) error {
+// Rename details: see FileSystem#Rename
+func (p *MountableFileSystem) Rename(oldPath Path, newPath Path) error {
 	mp0, _, dp0 := p.Resolve(oldPath)
 	mp1, _, _ := p.Resolve(newPath)
 	if mp0 != mp1 {
@@ -78,8 +78,8 @@ func (p *MountableDataProvider) Rename(oldPath Path, newPath Path) error {
 	return &MountPointNotFoundError{}
 }
 
-// MkDirs details: see DataProvider#MkDirs
-func (p *MountableDataProvider) MkDirs(path Path) error {
+// MkDirs details: see FileSystem#MkDirs
+func (p *MountableFileSystem) MkDirs(path Path) error {
 	_, providerPath, dp := p.Resolve(path)
 	if dp != nil {
 		return dp.MkDirs(providerPath)
@@ -88,11 +88,11 @@ func (p *MountableDataProvider) MkDirs(path Path) error {
 }
 
 // Close does nothing.
-func (p *MountableDataProvider) Close() error {
+func (p *MountableFileSystem) Close() error {
 	return nil
 }
 
-func (p *MountableDataProvider) getRoot() *virtualDir {
+func (p *MountableFileSystem) getRoot() *virtualDir {
 	if p.root == nil {
 		p.root = &virtualDir{}
 	}
@@ -100,7 +100,7 @@ func (p *MountableDataProvider) getRoot() *virtualDir {
 }
 
 // Mount includes the given provider into the leaf of the path. Important: you cannot mount one provider into another.
-func (p *MountableDataProvider) Mount(mountPoint Path, provider DataProvider) {
+func (p *MountableFileSystem) Mount(mountPoint Path, provider FileSystem) {
 	parent := p.getRoot()
 	names := mountPoint.Names()
 	// ensure the path
@@ -127,7 +127,7 @@ func (p *MountableDataProvider) Mount(mountPoint Path, provider DataProvider) {
 }
 
 // Resolve searches the virtual structure and returns a provider and the according data or nil and empty paths
-func (p *MountableDataProvider) Resolve(path Path) (mountPoint Path, providerPath Path, provider DataProvider) {
+func (p *MountableFileSystem) Resolve(path Path) (mountPoint Path, providerPath Path, provider FileSystem) {
 	names := path.Names()
 	parent := p.getRoot()
 	var child *namedEntry
@@ -138,7 +138,7 @@ func (p *MountableDataProvider) Resolve(path Path) (mountPoint Path, providerPat
 		}
 
 		mountPoint = mountPoint.Child(name)
-		if dp, ok := child.data.(DataProvider); ok {
+		if dp, ok := child.data.(FileSystem); ok {
 			//found the mount point
 			return mountPoint, path.TrimPrefix(mountPoint), dp
 		}
@@ -151,8 +151,8 @@ func (p *MountableDataProvider) Resolve(path Path) (mountPoint Path, providerPat
 	return "", "", nil
 }
 
-// ReadAttrs details: see DataProvider#ReadAttrs
-func (p *MountableDataProvider) ReadAttrs(path Path, dest interface{}) error {
+// ReadAttrs details: see FileSystem#ReadAttrs
+func (p *MountableFileSystem) ReadAttrs(path Path, dest interface{}) error {
 	_, providerPath, dp := p.Resolve(path)
 	if dp != nil {
 		return dp.ReadAttrs(providerPath, dest)
@@ -160,8 +160,8 @@ func (p *MountableDataProvider) ReadAttrs(path Path, dest interface{}) error {
 	return &MountPointNotFoundError{}
 }
 
-// WriteAttrs details: see DataProvider#WriteAttrs
-func (p *MountableDataProvider) WriteAttrs(path Path, src interface{}) error {
+// WriteAttrs details: see FileSystem#WriteAttrs
+func (p *MountableFileSystem) WriteAttrs(path Path, src interface{}) error {
 	_, providerPath, dp := p.Resolve(path)
 	if dp != nil {
 		return dp.WriteAttrs(providerPath, src)
@@ -169,8 +169,8 @@ func (p *MountableDataProvider) WriteAttrs(path Path, src interface{}) error {
 	return &MountPointNotFoundError{}
 }
 
-// ReadDir either dispatches as expected or the virtual directories. See also DataProvider#ReadDir
-func (p *MountableDataProvider) ReadDir(path Path, options interface{}) (DirEntList, error) {
+// ReadDir either dispatches as expected or the virtual directories. See also FileSystem#ReadDir
+func (p *MountableFileSystem) ReadDir(path Path, options interface{}) (DirEntList, error) {
 	_, providerPath, dp := p.Resolve(path)
 	if dp != nil {
 		return dp.ReadDir(providerPath, options)
@@ -197,8 +197,8 @@ func (p *MountableDataProvider) ReadDir(path Path, options interface{}) (DirEntL
 
 }
 
-// Delete dispatches as expected or removes a mount point. See DataProvider#Delete
-func (p *MountableDataProvider) Delete(path Path) error {
+// Delete dispatches as expected or removes a mount point. See FileSystem#Delete
+func (p *MountableFileSystem) Delete(path Path) error {
 	_, providerPath, dp := p.Resolve(path)
 	if dp != nil {
 		//do not delegate empty path delete

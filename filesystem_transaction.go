@@ -23,19 +23,21 @@ type TxOptions struct {
 	ReadOnly bool
 }
 
-// A TransactionableDataProvider supports also the usual style. If it implicitly creates a transaction per
+// A TransactionableFileSystem supports also the usual style. If it implicitly creates a transaction per
 // operation or in time slices or other criteria is implementation specific.
-type TransactionableDataProvider interface {
+type TransactionableFileSystem interface {
 	// Begins either a ReadOnly or ReadWrite transaction. ReadOnly may be ignored and used for optimizations only.
 	// The returned Transaction must be closed by either committing or by rollback.
 	Begin(opts TxOptions) (Tx, error)
-	DataProvider
+	FileSystem
 }
 
-// A Tx is the DataProvider contract providing commit and rollback methods.
+// A Tx is the FileSystem contract providing commit and rollback methods but also is a normal FileSystem.
+// An implementation should rollback, if a transaction has not been explicitly closed by a
+// Commit or Rollback.
 type Tx interface {
 	Commit() error
 	Rollback() error
-	// A simple close of the DataProvider without a commit will perform a Rollback.
-	DataProvider
+	// A simple close of the FileSystem without a commit will perform a Rollback.
+	FileSystem
 }

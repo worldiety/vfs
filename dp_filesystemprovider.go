@@ -7,7 +7,7 @@ import (
 	"runtime"
 )
 
-var _ DataProvider = (*FilesystemDataProvider)(nil)
+var _ FileSystem = (*FilesystemDataProvider)(nil)
 
 // A FilesystemDataProvider just works with the local filesystem and optionally supports a local filename prefix, e.g.
 // to just provide a subset instead of the entire root. See also Resolve.
@@ -31,7 +31,7 @@ func (p *FilesystemDataProvider) Resolve(path Path) string {
 	return filepath.Join(p.Prefix, filepath.Join(path.Names()...))
 }
 
-// Rename details: see DataProvider#Rename
+// Rename details: see FileSystem#Rename
 func (p *FilesystemDataProvider) Rename(oldPath Path, newPath Path) error {
 	err := os.Rename(p.Resolve(oldPath), p.Resolve(newPath))
 	if err != nil {
@@ -51,12 +51,12 @@ func (p *FilesystemDataProvider) Rename(oldPath Path, newPath Path) error {
 	return nil
 }
 
-// MkDirs details: see DataProvider#MkDirs
+// MkDirs details: see FileSystem#MkDirs
 func (p *FilesystemDataProvider) MkDirs(path Path) error {
 	return os.MkdirAll(p.Resolve(path), os.ModePerm)
 }
 
-// Open details: see DataProvider#Open
+// Open details: see FileSystem#Open
 func (p *FilesystemDataProvider) Open(path Path, flag int, perm os.FileMode) (Resource, error) {
 	readOnly := flag&os.O_RDONLY != 0
 	if readOnly {
@@ -80,12 +80,12 @@ func (p *FilesystemDataProvider) Open(path Path, flag int, perm os.FileMode) (Re
 
 }
 
-// Delete details: see DataProvider#Delete
+// Delete details: see FileSystem#Delete
 func (p *FilesystemDataProvider) Delete(path Path) error {
 	return os.RemoveAll(p.Resolve(path))
 }
 
-// ReadAttrs details: see DataProvider#ReadAttrs
+// ReadAttrs details: see FileSystem#ReadAttrs
 func (p *FilesystemDataProvider) ReadAttrs(path Path, dest interface{}) error {
 	if out, ok := dest.(*ResourceInfo); ok {
 		info, err := os.Stat(p.Resolve(path))
@@ -102,12 +102,12 @@ func (p *FilesystemDataProvider) ReadAttrs(path Path, dest interface{}) error {
 
 }
 
-// WriteAttrs details: see DataProvider#WriteAttrs
+// WriteAttrs details: see FileSystem#WriteAttrs
 func (p *FilesystemDataProvider) WriteAttrs(path Path, src interface{}) error {
 	return &UnsupportedOperationError{Message: "WriteAttrs"}
 }
 
-// ReadDir details: see DataProvider#ReadDir
+// ReadDir details: see FileSystem#ReadDir
 func (p *FilesystemDataProvider) ReadDir(path Path, options interface{}) (DirEntList, error) {
 	list, err := ioutil.ReadDir(p.Resolve(path))
 	if err != nil {
