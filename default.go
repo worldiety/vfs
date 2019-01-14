@@ -462,3 +462,91 @@ func (d *genericDirEntList) Close() error {
 func NewDirEntList(size int64, getter func(idx int64, dst *ResourceInfo) error) DirEntList {
 	return &genericDirEntList{0, size, getter}
 }
+
+// NewResourceReader wraps a reader and returns a Resource implementation which only delegates the Read method
+// and only supports limited (forward) Seek support by just discarding 1 byte after another.
+// Delegates also the Close call, if reader also implements Closeable.
+func NewResourceFromReader(reader io.Reader) Resource {
+	return &resourceReader{reader}
+}
+
+type resourceReader struct {
+	delegate io.Reader
+}
+
+func (r *resourceReader) ReadAt(b []byte, off int64) (n int, err error) {
+	return 0, &UnsupportedOperationError{}
+}
+
+func (r *resourceReader) Read(p []byte) (n int, err error) {
+	return r.delegate.Read(p)
+}
+
+func (r *resourceReader) WriteAt(b []byte, off int64) (n int, err error) {
+	return 0, &UnsupportedOperationError{}
+}
+
+func (r *resourceReader) Write(p []byte) (n int, err error) {
+	return 0, &UnsupportedOperationError{}
+}
+
+func (r *resourceReader) Seek(offset int64, whence int) (int64, error) {
+	if whence == io.SeekCurrent && offset >= 0 {
+		count := int64(0)
+		tmp := make([]byte, 1)
+		for i := int64(0); i < offset; i++ {
+			n, err := r.delegate.Read(tmp)
+			count += int64(n)
+			if err != nil {
+				return count, err
+			}
+		}
+		return count, nil
+	} else {
+		return 0, &UnsupportedOperationError{}
+	}
+}
+
+func (r *resourceReader) Close() error {
+	if closer, ok := r.delegate.(io.Closer); ok {
+		return closer.Close()
+	}
+	return nil
+}
+
+// NewResourceFromWriter wraps a writer and returns a Resource implementation which only delegates the Write method.
+// Delegates also the Close call, if writer also implements Closeable.
+func NewResourceFromWriter(writer io.Writer) Resource {
+	return &resourceWriter{writer}
+}
+
+type resourceWriter struct {
+	delegate io.Writer
+}
+
+func (r *resourceWriter) ReadAt(b []byte, off int64) (n int, err error) {
+	return 0, &UnsupportedOperationError{}
+}
+
+func (r *resourceWriter) Read(p []byte) (n int, err error) {
+	return 0, &UnsupportedOperationError{}
+}
+
+func (r *resourceWriter) WriteAt(b []byte, off int64) (n int, err error) {
+	return 0, &UnsupportedOperationError{}
+}
+
+func (r *resourceWriter) Write(p []byte) (n int, err error) {
+	return r.delegate.Write(p)
+}
+
+func (r *resourceWriter) Seek(offset int64, whence int) (int64, error) {
+	return 0, &UnsupportedOperationError{}
+}
+
+func (r *resourceWriter) Close() error {
+	if closer, ok := r.delegate.(io.Closer); ok {
+		return closer.Close()
+	}
+	return nil
+}
