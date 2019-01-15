@@ -46,8 +46,7 @@ func (p *LocalFileSystem) MkDirs(path Path) error {
 
 // Open details: see FileSystem#Open
 func (p *LocalFileSystem) Open(path Path, flag int, perm os.FileMode) (Resource, error) {
-	readOnly := flag&os.O_RDONLY != 0
-	if readOnly {
+	if flag == os.O_RDONLY {
 		return os.OpenFile(p.Resolve(path), flag, 0)
 	}
 	file, err := os.OpenFile(p.Resolve(path), flag, perm)
