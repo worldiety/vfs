@@ -463,7 +463,7 @@ func NewDirEntList(size int64, getter func(idx int64, dst *ResourceInfo) error) 
 	return &genericDirEntList{0, size, getter}
 }
 
-// NewResourceReader wraps a reader and returns a Resource implementation which only delegates the Read method
+// NewResourceFromReader wraps a reader and returns a Resource implementation which only delegates the Read method
 // and only supports limited (forward) Seek support by just discarding 1 byte after another.
 // Delegates also the Close call, if reader also implements Closeable.
 func NewResourceFromReader(reader io.Reader) Resource {
@@ -502,9 +502,8 @@ func (r *resourceReader) Seek(offset int64, whence int) (int64, error) {
 			}
 		}
 		return count, nil
-	} else {
-		return 0, &UnsupportedOperationError{}
 	}
+	return 0, &UnsupportedOperationError{}
 }
 
 func (r *resourceReader) Close() error {

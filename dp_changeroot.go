@@ -16,13 +16,18 @@ type ChRoot struct {
 	Delegate FileSystem
 }
 
+// Link details: see FileSystem#Link
+func (f *ChRoot) Link(oldPath Path, newPath Path, mode LinkMode, flags int32) error {
+	return f.Delegate.Link(f.Resolve(oldPath), f.Resolve(newPath), mode, flags)
+}
+
 // Resolve normalizes the given Path and inserts the prefix.
 // We normalize our path, before adding the prefix to avoid breaking out of our root
 func (f *ChRoot) Resolve(path Path) Path {
 	return f.Prefix.Add(path.Normalize())
 }
 
-// // Open details: see FileSystem#Open
+// Open details: see FileSystem#Open
 func (f *ChRoot) Open(path Path, flag int, perm os.FileMode) (Resource, error) {
 	return f.Delegate.Open(f.Resolve(path), flag, perm)
 }

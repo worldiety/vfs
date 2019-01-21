@@ -4,12 +4,26 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"strconv"
 )
 
 var _ FileSystem = (*LocalFileSystem)(nil)
 
 // A LocalFileSystem just works with the local filesystem.
 type LocalFileSystem struct {
+}
+
+// Link details: see FileSystem#Link
+func (p *LocalFileSystem) Link(oldPath Path, newPath Path, mode LinkMode, flags int32) error {
+	switch mode {
+	case SymLink:
+		return os.Symlink(p.Resolve(oldPath), p.Resolve(newPath))
+	case HardLink:
+		return os.Link(p.Resolve(oldPath), p.Resolve(newPath))
+	default:
+		return &UnsupportedOperationError{Message: "Mode is unsupported: " + strconv.Itoa(int(mode))}
+
+	}
 }
 
 // Resolve creates a platform specific filename from the given invariant path by adding the Prefix and using

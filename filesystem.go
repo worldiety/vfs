@@ -6,6 +6,21 @@ import (
 	"os"
 )
 
+// A LinkMode determines at creation time the way how links are created.
+type LinkMode int32
+
+const (
+	// SymLink writes the actual path into the file which is evaluated at runtime.
+	SymLink LinkMode = 0
+	// RefLink behaves like a file copy but shares underlying data structures to be more efficient.
+	// While multiple hardlinks always point to the same file and changes are reflected vice versa, a reflink
+	// really behaves like a copy using COW techniques.
+	RefLink LinkMode = 1
+	// HardLink is the entry point to a block of data. The data becomes inaccessible if there are no
+	// more hard links.
+	HardLink LinkMode = 2
+)
+
 // A Resource is an abstract accessor to read or write bytes. In general, not all methods are supported, either
 // due to the way the resources have been opened or because of the underlying implementation. In such cases
 // the affected method will always return an *UnsupportedOperationError.
@@ -94,6 +109,11 @@ type FileSystem interface {
 	// Rename moves a file from the old to the new path. If oldPath does not exist, ResourceNotFoundError is returned.
 	// If newPath exists, it will be replaced.
 	Rename(oldPath Path, newPath Path) error
+
+	// Link can create different kind of links for paths. The kind of links is specified by mode.
+	// The parameter flags is reserved (and unspecified) and can
+	// be used to narrow behavior e.g. for the reflink syscall.
+	Link(oldPath Path, newPath Path, mode LinkMode, flags int32) error
 
 	// Close when Done to release resources
 	io.Closer

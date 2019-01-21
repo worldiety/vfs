@@ -53,6 +53,22 @@ type MountableFileSystem struct {
 	root *virtualDir
 }
 
+// Link details: see FileSystem:Link
+func (p *MountableFileSystem) Link(oldPath Path, newPath Path, mode LinkMode, flags int32) error {
+	mp0, _, dp0 := p.Resolve(oldPath)
+	mp1, _, _ := p.Resolve(newPath)
+	if mp0 != mp1 {
+		return &UnsupportedOperationError{Message: "cannot Link across mount points: " + mp0.String() + " -> " + mp1.String()}
+	}
+
+	if dp0 != nil {
+		unwrapedOld := oldPath.TrimPrefix(mp0)
+		unwrappedNew := newPath.TrimPrefix(mp1)
+		return dp0.Link(unwrapedOld, unwrappedNew, mode, flags)
+	}
+	return &MountPointNotFoundError{}
+}
+
 // Open details: see FileSystem#Open
 func (p *MountableFileSystem) Open(path Path, flag int, perm os.FileMode) (Resource, error) {
 	_, providerPath, dp := p.Resolve(path)
