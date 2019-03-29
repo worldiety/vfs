@@ -54,51 +54,51 @@ type MountableFileSystem struct {
 }
 
 // Link details: see FileSystem:Link
-func (p *MountableFileSystem) Link(oldPath Path, newPath Path, mode LinkMode, flags int32) error {
-	mp0, _, dp0 := p.Resolve(oldPath)
-	mp1, _, _ := p.Resolve(newPath)
+func (p *MountableFileSystem) Link(oldPath string, newPath string, mode LinkMode, flags int32) error {
+	mp0, _, dp0 := p.Resolve(Path(oldPath))
+	mp1, _, _ := p.Resolve(Path(newPath))
 	if mp0 != mp1 {
 		return &UnsupportedOperationError{Message: "cannot Link across mount points: " + mp0.String() + " -> " + mp1.String()}
 	}
 
 	if dp0 != nil {
-		unwrapedOld := oldPath.TrimPrefix(mp0)
-		unwrappedNew := newPath.TrimPrefix(mp1)
-		return dp0.Link(unwrapedOld, unwrappedNew, mode, flags)
+		unwrapedOld := Path(oldPath).TrimPrefix(mp0)
+		unwrappedNew := Path(newPath).TrimPrefix(mp1)
+		return dp0.Link(unwrapedOld.String(), unwrappedNew.String(), mode, flags)
 	}
 	return &MountPointNotFoundError{}
 }
 
 // Open details: see FileSystem#Open
-func (p *MountableFileSystem) Open(path Path, flag int, perm os.FileMode) (Resource, error) {
-	_, providerPath, dp := p.Resolve(path)
+func (p *MountableFileSystem) Open(path string, flag int, perm os.FileMode) (Resource, error) {
+	_, providerPath, dp := p.Resolve(Path(path))
 	if dp != nil {
-		return dp.Open(providerPath, flag, perm)
+		return dp.Open(providerPath.String(), flag, perm)
 	}
 	return nil, &MountPointNotFoundError{}
 }
 
 // Rename details: see FileSystem#Rename
-func (p *MountableFileSystem) Rename(oldPath Path, newPath Path) error {
-	mp0, _, dp0 := p.Resolve(oldPath)
-	mp1, _, _ := p.Resolve(newPath)
+func (p *MountableFileSystem) Rename(oldPath string, newPath string) error {
+	mp0, _, dp0 := p.Resolve(Path(oldPath))
+	mp1, _, _ := p.Resolve(Path(newPath))
 	if mp0 != mp1 {
 		return &UnsupportedOperationError{Message: "cannot rename across mount points: " + mp0.String() + " -> " + mp1.String()}
 	}
 
 	if dp0 != nil {
-		unwrapedOld := oldPath.TrimPrefix(mp0)
-		unwrappedNew := newPath.TrimPrefix(mp1)
-		return dp0.Rename(unwrapedOld, unwrappedNew)
+		unwrapedOld := Path(oldPath).TrimPrefix(mp0)
+		unwrappedNew := Path(newPath).TrimPrefix(mp1)
+		return dp0.Rename(unwrapedOld.String(), unwrappedNew.String())
 	}
 	return &MountPointNotFoundError{}
 }
 
 // MkDirs details: see FileSystem#MkDirs
-func (p *MountableFileSystem) MkDirs(path Path) error {
-	_, providerPath, dp := p.Resolve(path)
+func (p *MountableFileSystem) MkDirs(path string) error {
+	_, providerPath, dp := p.Resolve(Path(path))
 	if dp != nil {
-		return dp.MkDirs(providerPath)
+		return dp.MkDirs(Path(providerPath).String())
 	}
 	return &MountPointNotFoundError{}
 }
@@ -168,32 +168,32 @@ func (p *MountableFileSystem) Resolve(path Path) (mountPoint Path, providerPath 
 }
 
 // ReadAttrs details: see FileSystem#ReadAttrs
-func (p *MountableFileSystem) ReadAttrs(path Path, dest interface{}) error {
-	_, providerPath, dp := p.Resolve(path)
+func (p *MountableFileSystem) ReadAttrs(path string, dest interface{}) error {
+	_, providerPath, dp := p.Resolve(Path(path))
 	if dp != nil {
-		return dp.ReadAttrs(providerPath, dest)
+		return dp.ReadAttrs(providerPath.String(), dest)
 	}
 	return &MountPointNotFoundError{}
 }
 
 // WriteAttrs details: see FileSystem#WriteAttrs
-func (p *MountableFileSystem) WriteAttrs(path Path, src interface{}) error {
-	_, providerPath, dp := p.Resolve(path)
+func (p *MountableFileSystem) WriteAttrs(path string, src interface{}) error {
+	_, providerPath, dp := p.Resolve(Path(path))
 	if dp != nil {
-		return dp.WriteAttrs(providerPath, src)
+		return dp.WriteAttrs(providerPath.String(), src)
 	}
 	return &MountPointNotFoundError{}
 }
 
 // ReadDir either dispatches as expected or the virtual directories. See also FileSystem#ReadDir
-func (p *MountableFileSystem) ReadDir(path Path, options interface{}) (DirEntList, error) {
-	_, providerPath, dp := p.Resolve(path)
+func (p *MountableFileSystem) ReadDir(path string, options interface{}) (DirEntList, error) {
+	_, providerPath, dp := p.Resolve(Path(path))
 	if dp != nil {
-		return dp.ReadDir(providerPath, options)
+		return dp.ReadDir(providerPath.String(), options)
 	}
 	//just try to walk
 	parent := p.getRoot()
-	names := path.Names()
+	names := Path(path).Names()
 	if len(names) == 0 {
 		return asDirEntList(p.root), nil
 	}
@@ -203,7 +203,7 @@ func (p *MountableFileSystem) ReadDir(path Path, options interface{}) (DirEntLis
 		if vdir, ok := child.data.(*virtualDir); ok {
 			parent = vdir
 		} else {
-			return nil, &ResourceNotFoundError{Path: path}
+			return nil, &ResourceNotFoundError{Path: Path(path)}
 		}
 	}
 	if vdir, ok := child.data.(*virtualDir); ok {
@@ -214,22 +214,22 @@ func (p *MountableFileSystem) ReadDir(path Path, options interface{}) (DirEntLis
 }
 
 // Delete dispatches as expected or removes a mount point. See FileSystem#Delete
-func (p *MountableFileSystem) Delete(path Path) error {
-	_, providerPath, dp := p.Resolve(path)
+func (p *MountableFileSystem) Delete(path string) error {
+	_, providerPath, dp := p.Resolve(Path(path))
 	if dp != nil {
 		//do not delegate empty path delete
 		if providerPath.NameCount() > 0 {
-			return dp.Delete(providerPath)
+			return dp.Delete(providerPath.String())
 		}
 	}
 
 	//just try to walk and clean any mount points
 	parent := p.getRoot()
-	names := path.Names()
+	names := Path(path).Names()
 	for _, name := range names[0 : len(names)-1] {
 		child := parent.ChildByName(name)
 		if child == nil {
-			return &ResourceNotFoundError{Path: path}
+			return &ResourceNotFoundError{Path: Path(path)}
 		}
 		if vdir, ok := child.data.(*virtualDir); ok {
 			parent = vdir

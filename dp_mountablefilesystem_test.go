@@ -76,13 +76,13 @@ func TestSimpleDelegation(t *testing.T) {
 
 	// rename
 	d := Path("/mnt/local/d.bin")
-	err = dp.Rename(c, d)
+	err = dp.Rename(c.String(), d.String())
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// delete
-	err = dp.Delete(d)
+	err = dp.Delete(d.String())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -99,7 +99,7 @@ func TestSimpleDelegation(t *testing.T) {
 
 	// mkdirs
 	e := Path("/mnt/local/x/y/z")
-	err = dp.MkDirs(e)
+	err = dp.MkDirs(e.String())
 	if err != nil {
 		t.Fatal(err)
 	}

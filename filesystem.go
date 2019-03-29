@@ -83,16 +83,16 @@ type FileSystem interface {
 	// To make your lookups easier, you may use some kind of magic identifier
 	// like rsc or $<some id> but you should generally avoid : as used by windows because it breaks
 	// the entire path semantics and conflicts with the Unix path separator.
-	Open(path Path, flag int, perm os.FileMode) (Resource, error)
+	Open(path string, flag int, perm os.FileMode) (Resource, error)
 
 	// Deletes a path entry and all contained children. It is not considered an error to delete a non-existing resource.
-	Delete(path Path) error
+	Delete(path string) error
 
 	// Reads Attributes. Every implementation must support *ResourceInfo
-	ReadAttrs(path Path, dest interface{}) error
+	ReadAttrs(path string, dest interface{}) error
 
 	// Writes Attributes. This is an optional implementation and may simply return UnsupportedOperationError.
-	WriteAttrs(path Path, src interface{}) error
+	WriteAttrs(path string, src interface{}) error
 
 	// ReadDir reads the contents of a directory. If path is not a directory, a ResourceNotFoundError is returned.
 	// options can be arbitrary and at least nil options must be supported, otherwise unsupported abstraction will
@@ -100,20 +100,20 @@ type FileSystem interface {
 	// retrieve the directory contents can be optimized, like required fields, sorting, page size, filter etc. This
 	// is especially important for online sources, because it also allows arbitrary queries, which are not
 	// related to a path hierarchy at all.
-	ReadDir(path Path, options interface{}) (DirEntList, error)
+	ReadDir(path string, options interface{}) (DirEntList, error)
 
 	// Tries to create the given path hierarchy. If path already denotes a directory nothing happens. If any path
 	// segment already refers a resource, an error must be returned.
-	MkDirs(path Path) error
+	MkDirs(path string) error
 
 	// Rename moves a file from the old to the new path. If oldPath does not exist, ResourceNotFoundError is returned.
 	// If newPath exists, it will be replaced.
-	Rename(oldPath Path, newPath Path) error
+	Rename(oldPath string, newPath string) error
 
 	// Link can create different kind of links for paths. The kind of links is specified by mode.
 	// The parameter flags is reserved (and unspecified) and can
 	// be used to narrow behavior e.g. for the reflink syscall.
-	Link(oldPath Path, newPath Path, mode LinkMode, flags int32) error
+	Link(oldPath string, newPath string, mode LinkMode, flags int32) error
 
 	// Close when Done to release resources
 	io.Closer

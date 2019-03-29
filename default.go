@@ -37,48 +37,48 @@ func SetDefault(provider FileSystem) {
 // Read opens the given resource for reading. May optionally also implement os.Seeker. If called on a directory
 // UnsupportedOperationError is returned. Delegates to Default()#Open.
 func Read(path Path) (Resource, error) {
-	return Default().Open(path, os.O_RDONLY, 0)
+	return Default().Open(path.String(), os.O_RDONLY, 0)
 }
 
 // Write opens the given resource for writing. Removes and recreates the file. May optionally also implement os.Seeker.
 // If elements of the path do not exist, they are created implicitly. Delegates to Default()#Open.
 func Write(path Path) (Resource, error) {
-	return Default().Open(path, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0666)
+	return Default().Open(path.String(), os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0666)
 }
 
 // Delete a path entry and all contained children. It is not considered an error to delete a non-existing resource.
 // Delegates to Default()#Delete.
 func Delete(path Path) error {
-	return Default().Delete(path)
+	return Default().Delete(path.String())
 }
 
 // ReadAttrs reads Attributes. Every implementation must support ResourceInfo. Delegates to Default()#ReadAttrs.
 func ReadAttrs(path Path, dest interface{}) error {
-	return Default().ReadAttrs(path, dest)
+	return Default().ReadAttrs(path.String(), dest)
 }
 
 // WriteAttrs writes Attributes. This is an optional implementation and may simply return UnsupportedOperationError.
 // Delegates to Default()#WriteAttrs.
 func WriteAttrs(path Path, src interface{}) error {
-	return Default().WriteAttrs(path, src)
+	return Default().WriteAttrs(path.String(), src)
 }
 
 // MkDirs tries to create the given path hierarchy. If path already denotes a directory nothing happens. If any path
 // segment already refers a file, an error must be returned. Delegates to Default()#MkDirs.
 func MkDirs(path Path) error {
-	return Default().MkDirs(path)
+	return Default().MkDirs(path.String())
 }
 
 // Rename moves a file from the old to the new path. If oldPath does not exist, ResourceNotFoundError is returned.
 // If newPath exists, it will be replaced. Delegates to Default()#Rename.
 func Rename(oldPath Path, newPath Path) error {
-	return Default().Rename(oldPath, newPath)
+	return Default().Rename(oldPath.String(), newPath.String())
 }
 
 // ReadDir is utility method to simply list a directory listing as *ResourceInfo, which is supported by all
 // DataProviders.
 func ReadDir(path Path) ([]ResourceInfo, error) {
-	res, err := Default().ReadDir(path, nil)
+	res, err := Default().ReadDir(path.String(), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -123,7 +123,7 @@ type WalkClosure func(path Path, info ResourceInfo, err error) error
 
 // Walk recursively goes down the entire path hierarchy starting at the given path
 func Walk(path Path, each WalkClosure) error {
-	res, err := Default().ReadDir(path, nil)
+	res, err := Default().ReadDir(path.String(), nil)
 	if err != nil {
 		return err
 	}
@@ -210,7 +210,7 @@ func WriteAll(path Path, data []byte) (int, error) {
 // Stat simply allocates a ResourceInfo and reads it, which must be supported by all implementations.
 func Stat(path Path) (ResourceInfo, error) {
 	info := &DefaultResourceInfo{}
-	err := Default().ReadAttrs(path, info)
+	err := Default().ReadAttrs(path.String(), info)
 	if err != nil {
 		return info, err
 	}

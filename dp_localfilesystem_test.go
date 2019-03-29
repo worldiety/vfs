@@ -24,7 +24,7 @@ func TestEmpty(t *testing.T) {
 	path := createTmpDir(t)
 	fs := &LocalFileSystem{}
 	SetDefault(fs)
-	dir, err := fs.ReadDir(path, nil)
+	dir, err := fs.ReadDir(path.String(), nil)
 	if err != nil {
 		t.Fatal("unexpected read failure", err)
 	}
@@ -101,7 +101,7 @@ func TestFiles(t *testing.T) {
 				}
 			}
 
-			dir, err := fs.ReadDir(path, nil)
+			dir, err := fs.ReadDir(path.String(), nil)
 			if err != nil {
 				t.Fatal("unexpected read failure", err)
 			}
@@ -147,7 +147,7 @@ func TestFiles(t *testing.T) {
 
 			//delete files
 			for _, info := range infos {
-				err := fs.Delete(path.Child(info.Name()))
+				err := fs.Delete(path.Child(info.Name()).String())
 				if err != nil {
 					t.Fatal("expected to delete file", err)
 				}

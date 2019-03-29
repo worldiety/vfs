@@ -89,7 +89,7 @@ var CheckIsEmpty = &Check{
 		}
 		//not empty, try to clear to make test a bit more robust
 		for _, entry := range list {
-			err := dp.Delete(Path(entry.Name()))
+			err := dp.Delete(Path(entry.Name()).String())
 			if err != nil {
 				return err
 			}
@@ -243,7 +243,7 @@ var CheckRename = &Check{
 		a := Path("/a.bin")
 		b := Path("/b.bin")
 
-		err := dp.Delete(a)
+		err := dp.Delete(a.String())
 		if err != nil {
 			return err
 		}
@@ -266,7 +266,7 @@ var CheckRename = &Check{
 		}
 
 		// a exists and b not, must succeed
-		err = dp.Rename(a, b)
+		err = dp.Rename(a.String(), b.String())
 		if err != nil {
 			return err
 		}
@@ -289,7 +289,7 @@ var CheckRename = &Check{
 			return err
 		}
 
-		err = dp.Rename(b, c)
+		err = dp.Rename(b.String(), c.String())
 		if err != nil {
 			return err
 		}
@@ -318,13 +318,13 @@ var UnsupportedAttributes = &Check{Test: func(dp FileSystem) error {
 		return err
 	}
 	mustSupport := &DefaultResourceInfo{}
-	err = dp.ReadAttrs(c, mustSupport)
+	err = dp.ReadAttrs(c.String(), mustSupport)
 	if err != nil {
 		return err
 	}
 
 	mustNotSupport := &unsupportedType{}
-	err = dp.ReadAttrs(c, mustNotSupport)
+	err = dp.ReadAttrs(c.String(), mustNotSupport)
 	if err == nil {
 		return fmt.Errorf("reading into a generic unsupportedType{} with private members and no public fields is an error")
 	}
@@ -387,7 +387,7 @@ var UnsupportedAttributes = &Check{Test: func(dp FileSystem) error {
 	}
 
 	// same for write
-	err = dp.WriteAttrs(c, mustNotSupport)
+	err = dp.WriteAttrs(c.String(), mustNotSupport)
 	if err == nil {
 		return fmt.Errorf("writing from a generic unsupportedType{} with private members and no public fields is an error")
 	}

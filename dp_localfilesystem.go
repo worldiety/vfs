@@ -14,12 +14,12 @@ type LocalFileSystem struct {
 }
 
 // Link details: see FileSystem#Link
-func (p *LocalFileSystem) Link(oldPath Path, newPath Path, mode LinkMode, flags int32) error {
+func (p *LocalFileSystem) Link(oldPath string, newPath string, mode LinkMode, flags int32) error {
 	switch mode {
 	case SymLink:
-		return os.Symlink(p.Resolve(oldPath), p.Resolve(newPath))
+		return os.Symlink(p.Resolve(Path(oldPath)), p.Resolve(Path(newPath)))
 	case HardLink:
-		return os.Link(p.Resolve(oldPath), p.Resolve(newPath))
+		return os.Link(p.Resolve(Path(oldPath)), p.Resolve(Path(newPath)))
 	default:
 		return &UnsupportedOperationError{Message: "Mode is unsupported: " + strconv.Itoa(int(mode))}
 
@@ -34,8 +34,8 @@ func (p *LocalFileSystem) Resolve(path Path) string {
 }
 
 // Rename details: see FileSystem#Rename
-func (p *LocalFileSystem) Rename(oldPath Path, newPath Path) error {
-	err := os.Rename(p.Resolve(oldPath), p.Resolve(newPath))
+func (p *LocalFileSystem) Rename(oldPath string, newPath string) error {
+	err := os.Rename(p.Resolve(Path(oldPath)), p.Resolve(Path(newPath)))
 	if err != nil {
 		//perhaps the backend does not support the rename if target already exists
 		err2 := p.Delete(newPath)
@@ -44,7 +44,7 @@ func (p *LocalFileSystem) Rename(oldPath Path, newPath Path) error {
 			return err
 		}
 		//retry again
-		err3 := os.Rename(p.Resolve(oldPath), p.Resolve(newPath))
+		err3 := os.Rename(p.Resolve(Path(oldPath)), p.Resolve(Path(newPath)))
 		if err3 != nil {
 			//intentionally ignore err3 and return original failure
 			return err
@@ -54,25 +54,25 @@ func (p *LocalFileSystem) Rename(oldPath Path, newPath Path) error {
 }
 
 // MkDirs details: see FileSystem#MkDirs
-func (p *LocalFileSystem) MkDirs(path Path) error {
-	return os.MkdirAll(p.Resolve(path), os.ModePerm)
+func (p *LocalFileSystem) MkDirs(path string) error {
+	return os.MkdirAll(p.Resolve(Path(path)), os.ModePerm)
 }
 
 // Open details: see FileSystem#Open
-func (p *LocalFileSystem) Open(path Path, flag int, perm os.FileMode) (Resource, error) {
+func (p *LocalFileSystem) Open(path string, flag int, perm os.FileMode) (Resource, error) {
 	if flag == os.O_RDONLY {
-		return os.OpenFile(p.Resolve(path), flag, 0)
+		return os.OpenFile(p.Resolve(Path(path)), flag, 0)
 	}
-	file, err := os.OpenFile(p.Resolve(path), flag, perm)
+	file, err := os.OpenFile(p.Resolve(Path(path)), flag, perm)
 	if _, ok := err.(*os.PathError); ok {
 		//try to recreate parent folder
-		err2 := p.MkDirs(path.Parent())
+		err2 := p.MkDirs(Path(path).Parent().String())
 		if err2 != nil {
 			//suppress err2 intentionally and return the original failure
 			return nil, err
 		}
 		// mkdir is fine, retry again
-		file, err = os.OpenFile(p.Resolve(path), flag, perm)
+		file, err = os.OpenFile(p.Resolve(Path(path)), flag, perm)
 		if err != nil {
 			return nil, err
 		}
@@ -82,14 +82,14 @@ func (p *LocalFileSystem) Open(path Path, flag int, perm os.FileMode) (Resource,
 }
 
 // Delete details: see FileSystem#Delete
-func (p *LocalFileSystem) Delete(path Path) error {
-	return os.RemoveAll(p.Resolve(path))
+func (p *LocalFileSystem) Delete(path string) error {
+	return os.RemoveAll(p.Resolve(Path(path)))
 }
 
 // ReadAttrs details: see FileSystem#ReadAttrs
-func (p *LocalFileSystem) ReadAttrs(path Path, dest interface{}) error {
+func (p *LocalFileSystem) ReadAttrs(path string, dest interface{}) error {
 	if out, ok := dest.(ResourceInfo); ok {
-		info, err := os.Stat(p.Resolve(path))
+		info, err := os.Stat(p.Resolve(Path(path)))
 		if err != nil {
 			return err
 		}
@@ -104,13 +104,13 @@ func (p *LocalFileSystem) ReadAttrs(path Path, dest interface{}) error {
 }
 
 // WriteAttrs details: see FileSystem#WriteAttrs
-func (p *LocalFileSystem) WriteAttrs(path Path, src interface{}) error {
+func (p *LocalFileSystem) WriteAttrs(path string, src interface{}) error {
 	return &UnsupportedOperationError{Message: "WriteAttrs"}
 }
 
 // ReadDir details: see FileSystem#ReadDir
-func (p *LocalFileSystem) ReadDir(path Path, options interface{}) (DirEntList, error) {
-	list, err := ioutil.ReadDir(p.Resolve(path))
+func (p *LocalFileSystem) ReadDir(path string, options interface{}) (DirEntList, error) {
+	list, err := ioutil.ReadDir(p.Resolve(Path(path)))
 	if err != nil {
 		return nil, err
 	}

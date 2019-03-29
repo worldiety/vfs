@@ -17,8 +17,8 @@ type ChRoot struct {
 }
 
 // Link details: see FileSystem#Link
-func (f *ChRoot) Link(oldPath Path, newPath Path, mode LinkMode, flags int32) error {
-	return f.Delegate.Link(f.Resolve(oldPath), f.Resolve(newPath), mode, flags)
+func (f *ChRoot) Link(oldPath string, newPath string, mode LinkMode, flags int32) error {
+	return f.Delegate.Link(f.Resolve(Path(oldPath)).String(), f.Resolve(Path(newPath)).String(), mode, flags)
 }
 
 // Resolve normalizes the given Path and inserts the prefix.
@@ -28,38 +28,38 @@ func (f *ChRoot) Resolve(path Path) Path {
 }
 
 // Open details: see FileSystem#Open
-func (f *ChRoot) Open(path Path, flag int, perm os.FileMode) (Resource, error) {
-	return f.Delegate.Open(f.Resolve(path), flag, perm)
+func (f *ChRoot) Open(path string, flag int, perm os.FileMode) (Resource, error) {
+	return f.Delegate.Open(f.Resolve(Path(path)).String(), flag, perm)
 }
 
 // Delete details: see FileSystem#Delete
-func (f *ChRoot) Delete(path Path) error {
-	return f.Delegate.Delete(f.Resolve(path))
+func (f *ChRoot) Delete(path string) error {
+	return f.Delegate.Delete(f.Resolve(Path(path)).String())
 }
 
 // ReadAttrs details: see FileSystem#ReadAttrs
-func (f *ChRoot) ReadAttrs(path Path, dest interface{}) error {
-	return f.Delegate.ReadAttrs(f.Resolve(path), dest)
+func (f *ChRoot) ReadAttrs(path string, dest interface{}) error {
+	return f.Delegate.ReadAttrs(f.Resolve(Path(path)).String(), dest)
 }
 
 // WriteAttrs details: see FileSystem#WriteAttrs
-func (f *ChRoot) WriteAttrs(path Path, src interface{}) error {
-	return f.Delegate.WriteAttrs(f.Resolve(path), src)
+func (f *ChRoot) WriteAttrs(path string, src interface{}) error {
+	return f.Delegate.WriteAttrs(f.Resolve(Path(path)).String(), src)
 }
 
 // ReadDir details: see FileSystem#ReadDir
-func (f *ChRoot) ReadDir(path Path, options interface{}) (DirEntList, error) {
-	return f.Delegate.ReadDir(f.Resolve(path), options)
+func (f *ChRoot) ReadDir(path string, options interface{}) (DirEntList, error) {
+	return f.Delegate.ReadDir(f.Resolve(Path(path)).String(), options)
 }
 
 // MkDirs details: see FileSystem#MkDirs
-func (f *ChRoot) MkDirs(path Path) error {
-	return f.Delegate.MkDirs(f.Resolve(path))
+func (f *ChRoot) MkDirs(path string) error {
+	return f.Delegate.MkDirs(f.Resolve(Path(path)).String())
 }
 
 // Rename details: see FileSystem#Rename
-func (f *ChRoot) Rename(oldPath Path, newPath Path) error {
-	return f.Delegate.Rename(f.Resolve(oldPath), f.Resolve(newPath))
+func (f *ChRoot) Rename(oldPath string, newPath string) error {
+	return f.Delegate.Rename(f.Resolve(Path(oldPath)).String(), f.Resolve(Path(newPath)).String())
 }
 
 // Close details: see FileSystem#Close
