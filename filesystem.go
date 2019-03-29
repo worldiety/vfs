@@ -7,7 +7,7 @@ import (
 )
 
 // A LinkMode determines at creation time the way how links are created.
-type LinkMode int32
+type LinkMode = int32
 
 const (
 	// SymLink writes the actual path into the file which is evaluated at runtime.
@@ -110,10 +110,14 @@ type FileSystem interface {
 	// If newPath exists, it will be replaced.
 	Rename(oldPath string, newPath string) error
 
-	// Link can create different kind of links for paths. The kind of links is specified by mode.
+	// Link can create different kind of links for paths. The kind of links is specified by mode (symbolic, reference
+	// or hard). Symbolic is usually an os specific file containing the actual path to follow. Reference is like
+	// a real copy but for copy-on-write systems this is nearly a no-op but changes will not be reflected on the source
+	// file. In contrast to that, a hardlink points to the original source file, so two (or more) names for the same
+	// resource.
 	// The parameter flags is reserved (and unspecified) and can
 	// be used to narrow behavior e.g. for the reflink syscall.
-	Link(oldPath string, newPath string, mode LinkMode, flags int32) error
+	Link(oldPath string, newPath string, mode int32, flags int32) error
 
 	// Close when Done to release resources
 	io.Closer
@@ -145,9 +149,6 @@ type DirEntList interface {
 	io.Closer
 }
 
-
-
-
 // A ResourceInfo represents the default meta data set which must be supported by all implementations.
 // However each implementation may also support other metadata as well.
 type ResourceInfo interface {
@@ -168,4 +169,3 @@ type ResourceInfo interface {
 	// ModTime returns modification time in milliseconds since epoch 1970.
 	ModTime() int64
 }
-
