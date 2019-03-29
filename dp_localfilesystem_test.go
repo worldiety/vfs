@@ -119,15 +119,15 @@ func TestFiles(t *testing.T) {
 
 			//read files
 			for _, info := range infos {
-				src := byName(t, fileSet, info.Name)
-				if len(src.data) != int(info.Size) {
-					t.Fatal("expected ", len(src.data), "bytes but got", info.Size)
+				src := byName(t, fileSet, info.Name())
+				if len(src.data) != int(info.Size()) {
+					t.Fatal("expected ", len(src.data), "bytes but got", info.Size())
 				}
-				if !info.Mode.IsRegular() {
-					t.Fatal("expected file, but got", info.Mode.String())
+				if !info.Mode().IsRegular() {
+					t.Fatal("expected file, but got", info.Mode().String())
 				}
-				if info.Mode.IsDir() {
-					t.Fatal("expected not a dir", info.Mode.String())
+				if info.Mode().IsDir() {
+					t.Fatal("expected not a dir", info.Mode().String())
 				}
 
 				reader, err := Read(path.Child(src.name))
@@ -147,7 +147,7 @@ func TestFiles(t *testing.T) {
 
 			//delete files
 			for _, info := range infos {
-				err := fs.Delete(path.Child(info.Name))
+				err := fs.Delete(path.Child(info.Name()))
 				if err != nil {
 					t.Fatal("expected to delete file", err)
 				}

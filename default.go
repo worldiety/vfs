@@ -77,7 +77,7 @@ func Rename(oldPath Path, newPath Path) error {
 
 // ReadDir is utility method to simply list a directory listing as *ResourceInfo, which is supported by all
 // DataProviders.
-func ReadDir(path Path) ([]*ResourceInfo, error) {
+func ReadDir(path Path) ([]ResourceInfo, error) {
 	res, err := Default().ReadDir(path, nil)
 	if err != nil {
 		return nil, err
@@ -90,9 +90,9 @@ func ReadDir(path Path) ([]*ResourceInfo, error) {
 		}
 		expectedEntries = int(res.Size())
 	}
-	list := make([]*ResourceInfo, expectedEntries)[0:0]
+	list := make([]ResourceInfo, expectedEntries)[0:0]
 	for res.Next() {
-		row := &ResourceInfo{}
+		row := &DefaultResourceInfo{}
 		err = res.Scan(row)
 		if err != nil {
 			return list, err
@@ -105,7 +105,7 @@ func ReadDir(path Path) ([]*ResourceInfo, error) {
 // ReadDirRecur fully reads the given directory recursively and returns entries with full qualified paths.
 func ReadDirRecur(path Path) ([]*PathEntry, error) {
 	res := make([]*PathEntry, 0)
-	err := Walk(path, func(path Path, info *ResourceInfo, err error) error {
+	err := Walk(path, func(path Path, info ResourceInfo, err error) error {
 		if err != nil {
 			return err
 		}
@@ -119,7 +119,7 @@ func ReadDirRecur(path Path) ([]*PathEntry, error) {
 }
 
 // A WalkClosure is invoked for each entry in Walk, as long as no error is returned and entries are available.
-type WalkClosure func(path Path, info *ResourceInfo, err error) error
+type WalkClosure func(path Path, info ResourceInfo, err error) error
 
 // Walk recursively goes down the entire path hierarchy starting at the given path
 func Walk(path Path, each WalkClosure) error {
@@ -129,7 +129,7 @@ func Walk(path Path, each WalkClosure) error {
 	}
 
 	for res.Next() {
-		tmp := &ResourceInfo{}
+		tmp := &DefaultResourceInfo{}
 		err := res.Scan(tmp)
 		if err != nil {
 			// the dev may decide to ignore errors and continue walking, e.g. due to permission denied
@@ -142,13 +142,13 @@ func Walk(path Path, each WalkClosure) error {
 		}
 
 		//delegate call
-		err = each(path.Child(tmp.Name), tmp, nil)
+		err = each(path.Child(tmp.Name()), tmp, nil)
 		if err != nil {
 			return err
 		}
 
-		if tmp.Mode.IsDir() {
-			return Walk(path.Child(tmp.Name), each)
+		if tmp.Mode().IsDir() {
+			return Walk(path.Child(tmp.Name()), each)
 		}
 		return nil
 	}
@@ -158,7 +158,7 @@ func Walk(path Path, each WalkClosure) error {
 // A PathEntry simply provides a Path and the related ResourceInfo
 type PathEntry struct {
 	Path     Path
-	Resource *ResourceInfo
+	Resource ResourceInfo
 }
 
 // Equals checks for equality with another PathEntry
@@ -167,7 +167,7 @@ func (e *PathEntry) Equals(other interface{}) bool {
 		return false
 	}
 	if o, ok := other.(*PathEntry); ok {
-		return o.Path == e.Path && o.Resource.Equals(e.Resource)
+		return o.Path == e.Path && Equals(o.Resource, e.Resource)
 	}
 	return false
 }
@@ -208,8 +208,8 @@ func WriteAll(path Path, data []byte) (int, error) {
 }
 
 // Stat simply allocates a ResourceInfo and reads it, which must be supported by all implementations.
-func Stat(path Path) (*ResourceInfo, error) {
-	info := &ResourceInfo{}
+func Stat(path Path) (ResourceInfo, error) {
+	info := &DefaultResourceInfo{}
 	err := Default().ReadAttrs(path, info)
 	if err != nil {
 		return info, err
@@ -291,21 +291,21 @@ func Copy(src Path, dst Path, options *CopyOptions) error {
 		return err
 	}
 
-	if info.Mode.IsDir() {
+	if info.Mode().IsDir() {
 		var objectsFound int64
 		var bytesFound int64
 		var objectsProcessed int64
 		var bytesProcessed int64
 		// collect info
 		list := make([]*PathEntry, 0)
-		err = Walk(src, func(path Path, info *ResourceInfo, err error) error {
+		err = Walk(src, func(path Path, info ResourceInfo, err error) error {
 			if err != nil {
 				return options.onError(path, err)
 			}
 			list = append(list, &PathEntry{path, info})
 			objectsFound++
-			if info.Mode.IsRegular() {
-				bytesFound += info.Size
+			if info.Mode().IsRegular() {
+				bytesFound += info.Size()
 			}
 			options.onScan(path, objectsFound, bytesFound)
 			return nil
@@ -318,7 +318,7 @@ func Copy(src Path, dst Path, options *CopyOptions) error {
 		//walk through, directory are first
 		for _, entry := range list {
 			dstPath := ConcatPaths(dst, entry.Path.TrimPrefix(src))
-			if entry.Resource.Mode.IsDir() {
+			if entry.Resource.Mode().IsDir() {
 				err := MkDirs(dstPath)
 				if err != nil {
 					err = options.onError(dstPath, err)
@@ -328,7 +328,7 @@ func Copy(src Path, dst Path, options *CopyOptions) error {
 				}
 				objectsProcessed++
 				options.onCopied(entry.Path, objectsProcessed, bytesProcessed)
-			} else if entry.Resource.Mode.IsRegular() {
+			} else if entry.Resource.Mode().IsRegular() {
 				reader, err := Read(entry.Path)
 				if err != nil {
 					return err
@@ -338,7 +338,7 @@ func Copy(src Path, dst Path, options *CopyOptions) error {
 					silentClose(reader)
 					return err
 				}
-				written, err := copyBuffer(entry.Path, dstPath, entry.Resource.Size, reader, writer, nil, options)
+				written, err := copyBuffer(entry.Path, dstPath, entry.Resource.Size(), reader, writer, nil, options)
 				silentClose(reader)
 				silentClose(writer)
 				if err != nil {
@@ -362,7 +362,7 @@ func Copy(src Path, dst Path, options *CopyOptions) error {
 		return nil
 	}
 
-	options.onScan(src, 1, info.Size)
+	options.onScan(src, 1, info.Size())
 	//just copy file
 	reader, err := Read(src)
 	if err != nil {
@@ -374,7 +374,7 @@ func Copy(src Path, dst Path, options *CopyOptions) error {
 		return err
 	}
 	defer silentClose(writer)
-	written, err := copyBuffer(src, dst, info.Size, reader, writer, nil, options)
+	written, err := copyBuffer(src, dst, info.Size(), reader, writer, nil, options)
 	if err != nil {
 		return err
 	}
@@ -424,7 +424,7 @@ func copyBuffer(srcPath Path, dstPath Path, totalSize int64, src io.Reader, dst 
 type genericDirEntList struct {
 	currentIdx int64
 	count      int64
-	getAt      func(idx int64, dst *ResourceInfo) error
+	getAt      func(idx int64, dst ResourceInfo) error
 }
 
 func (d *genericDirEntList) Next() bool {
@@ -441,7 +441,7 @@ func (d *genericDirEntList) Err() error {
 }
 
 func (d *genericDirEntList) Scan(dest interface{}) error {
-	if out, ok := dest.(*ResourceInfo); ok {
+	if out, ok := dest.(ResourceInfo); ok {
 		if d.currentIdx >= d.count {
 			return d.getAt(d.count-1, out)
 		}
@@ -459,7 +459,7 @@ func (d *genericDirEntList) Close() error {
 }
 
 // NewDirEntList is a utility function to simply wrap a function into a lazy DirEntList implementation
-func NewDirEntList(size int64, getter func(idx int64, dst *ResourceInfo) error) DirEntList {
+func NewDirEntList(size int64, getter func(idx int64, dst ResourceInfo) error) DirEntList {
 	return &genericDirEntList{0, size, getter}
 }
 
@@ -548,4 +548,74 @@ func (r *resourceWriter) Close() error {
 		return closer.Close()
 	}
 	return nil
+}
+
+var _ ResourceInfo = (*DefaultResourceInfo)(nil)
+
+// A DefaultResourceInfo is the default implementation of the ResourceInfo interface
+type DefaultResourceInfo struct {
+	name    string
+	size    int64
+	mode    os.FileMode
+	modTime int64
+}
+
+// SetName see ResourceInfo#SetName
+func (r *DefaultResourceInfo) SetName(name string) {
+	r.name = name
+}
+
+// Name see ResourceInfo#Name
+func (r *DefaultResourceInfo) Name() string {
+	return r.name
+}
+
+// SetSize see ResourceInfo#SetSize
+func (r *DefaultResourceInfo) SetSize(size int64) {
+	r.size = size
+}
+
+// Size see ResourceInfo#Size
+func (r *DefaultResourceInfo) Size() int64 {
+	return r.size
+}
+
+// SetMode see ResourceInfo#SetMode
+func (r *DefaultResourceInfo) SetMode(mode os.FileMode) {
+	r.mode = mode
+}
+
+// Mode see ResourceInfo#Mode
+func (r *DefaultResourceInfo) Mode() os.FileMode {
+	return r.mode
+}
+
+// SetModTime see ResourceInfo#SetModTime
+func (r *DefaultResourceInfo) SetModTime(time int64) {
+	r.modTime = time
+}
+
+// ModTime see ResourceInfo#ModTime
+func (r *DefaultResourceInfo) ModTime() int64 {
+	return r.modTime
+}
+
+// Equals checks for equality with another PathEntry
+func (r *DefaultResourceInfo) Equals(other interface{}) bool {
+	if r == nil || other == nil {
+		return false
+	}
+	if o, ok := other.(DefaultResourceInfo); ok {
+		return o.name == r.name && o.size == r.size && o.modTime == r.modTime && o.mode == r.mode
+	}
+	return false
+}
+
+// Equals returns true if the values defined by ResourceInfo are equal.
+// However it does not inspect or check other fields or values.
+func Equals(a ResourceInfo, b ResourceInfo) bool {
+	if a == nil || b == nil {
+		return false
+	}
+	return a.Name() == b.Name() && a.Size() == b.Size() && a.ModTime() == b.ModTime() && a.Mode() == b.Mode()
 }

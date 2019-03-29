@@ -89,7 +89,7 @@ var CheckIsEmpty = &Check{
 		}
 		//not empty, try to clear to make test a bit more robust
 		for _, entry := range list {
-			err := dp.Delete(Path(entry.Name))
+			err := dp.Delete(Path(entry.Name()))
 			if err != nil {
 				return err
 			}
@@ -153,15 +153,15 @@ var CheckReadAny = &Check{
 		}
 
 		for _, entry := range list {
-			if entry.Resource.Mode.IsDir() {
+			if entry.Resource.Mode().IsDir() {
 				continue
 			}
 			tmp, err := ReadAll(entry.Path)
 			if err != nil {
 				return err
 			}
-			if len(tmp) != int(entry.Resource.Size) {
-				return fmt.Errorf("expected same size of %v: expected %v bytes but got %v", entry.Path, entry.Resource.Size, len(tmp))
+			if len(tmp) != int(entry.Resource.Size()) {
+				return fmt.Errorf("expected same size of %v: expected %v bytes but got %v", entry.Path, entry.Resource.Size(), len(tmp))
 			}
 		}
 		return nil
@@ -278,8 +278,8 @@ var CheckRename = &Check{
 		if err != nil {
 			return fmt.Errorf("b must be available")
 		}
-		if info.Size != 7 {
-			return fmt.Errorf("a must be 7 bytes long but is %v", info.Size)
+		if info.Size() != 7 {
+			return fmt.Errorf("a must be 7 bytes long but is %v", info.Size())
 		}
 
 		// b exists and c exists, must succeed
@@ -302,8 +302,8 @@ var CheckRename = &Check{
 		if err != nil {
 			return err
 		}
-		if info.Size != 7 {
-			return fmt.Errorf("a must be 7 bytes long but is %v", info.Size)
+		if info.Size() != 7 {
+			return fmt.Errorf("a must be 7 bytes long but is %v", info.Size())
 		}
 		return nil
 	},
@@ -317,7 +317,7 @@ var UnsupportedAttributes = &Check{Test: func(dp FileSystem) error {
 	if err != nil {
 		return err
 	}
-	mustSupport := &ResourceInfo{}
+	mustSupport := &DefaultResourceInfo{}
 	err = dp.ReadAttrs(c, mustSupport)
 	if err != nil {
 		return err
@@ -347,7 +347,7 @@ var UnsupportedAttributes = &Check{Test: func(dp FileSystem) error {
 
 	count := 0
 	for dir.Next() {
-		mustSupport := &ResourceInfo{}
+		mustSupport := &DefaultResourceInfo{}
 		err = dir.Scan(mustSupport)
 		if err != nil {
 			return err

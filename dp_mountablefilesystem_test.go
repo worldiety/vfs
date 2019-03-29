@@ -60,7 +60,7 @@ func TestSimpleDelegation(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if stat.Size != 13 {
+	if stat.Size() != 13 {
 		t.Fatalf("expected 13 bytes but got %v", stat)
 	}
 

@@ -132,7 +132,7 @@ type DirEntList interface {
 	// Err returns the first error, if any, that was encountered during iteration.
 	Err() error
 
-	// Scan supports at least reading data into *ResourceInfo.
+	// Scan supports at least reading data into a ResourceInfo interface.
 	// Especially it is not guaranteed to fill or map into unknown
 	// structs even if the field structure is identical.
 	Scan(dest interface{}) error
@@ -145,22 +145,27 @@ type DirEntList interface {
 	io.Closer
 }
 
+
+
+
 // A ResourceInfo represents the default meta data set which must be supported by all implementations.
 // However each implementation may also support other metadata as well.
-type ResourceInfo struct {
-	Name    string      // The local name of this resource
-	Size    int64       // length in bytes for regular files of the primary data stream; system-dependent for others
-	Mode    os.FileMode // file mode bits. Mode.IsDir and Mode.IsRegular are your friends.
-	ModTime int64       // modification time in milliseconds since epoch 1970.
+type ResourceInfo interface {
+	// SetName sets the local name of this resource
+	SetName(name string)
+	// Name returns the name of the resource
+	Name() string
+	// SetSize sets the length in bytes for regular files of the primary data stream; system-dependent for others
+	SetSize(size int64)
+	// Size returns the length in bytes for regular files of the primary data stream; system-dependent for others
+	Size() int64
+	// SetMode sets the file mode bits
+	SetMode(mode os.FileMode)
+	// Mode returns the file mode bits. Mode.IsDir and Mode.IsRegular are your friends.
+	Mode() os.FileMode
+	// SetModTime modification time in milliseconds since epoch 1970.
+	SetModTime(time int64)
+	// ModTime returns modification time in milliseconds since epoch 1970.
+	ModTime() int64
 }
 
-// Equals checks for equality with another PathEntry
-func (e *ResourceInfo) Equals(other interface{}) bool {
-	if e == nil || other == nil {
-		return false
-	}
-	if o, ok := other.(*ResourceInfo); ok {
-		return o.Name == e.Name && o.Size == e.Size && o.ModTime == e.ModTime && o.Mode == e.Mode
-	}
-	return false
-}

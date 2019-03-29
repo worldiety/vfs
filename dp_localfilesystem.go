@@ -88,15 +88,15 @@ func (p *LocalFileSystem) Delete(path Path) error {
 
 // ReadAttrs details: see FileSystem#ReadAttrs
 func (p *LocalFileSystem) ReadAttrs(path Path, dest interface{}) error {
-	if out, ok := dest.(*ResourceInfo); ok {
+	if out, ok := dest.(ResourceInfo); ok {
 		info, err := os.Stat(p.Resolve(path))
 		if err != nil {
 			return err
 		}
-		out.Name = info.Name()
-		out.Mode = info.Mode()
-		out.ModTime = info.ModTime().UnixNano() / 1e6
-		out.Size = info.Size()
+		out.SetName(info.Name())
+		out.SetMode(info.Mode())
+		out.SetModTime(info.ModTime().UnixNano() / 1e6)
+		out.SetSize(info.Size())
 		return nil
 	}
 	return &UnsupportedAttributesError{Data: dest}
@@ -114,11 +114,11 @@ func (p *LocalFileSystem) ReadDir(path Path, options interface{}) (DirEntList, e
 	if err != nil {
 		return nil, err
 	}
-	return NewDirEntList(int64(len(list)), func(idx int64, out *ResourceInfo) error {
-		out.Name = list[int(idx)].Name()
-		out.Mode = list[int(idx)].Mode()
-		out.ModTime = list[int(idx)].ModTime().UnixNano() / 1e6
-		out.Size = list[int(idx)].Size()
+	return NewDirEntList(int64(len(list)), func(idx int64, out ResourceInfo) error {
+		out.SetName(list[int(idx)].Name())
+		out.SetMode(list[int(idx)].Mode())
+		out.SetModTime(list[int(idx)].ModTime().UnixNano() / 1e6)
+		out.SetSize(list[int(idx)].Size())
 		return nil
 	}), nil
 

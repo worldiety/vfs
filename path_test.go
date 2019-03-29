@@ -195,9 +195,9 @@ func TestPath_EndsWith(t *testing.T) {
 }
 
 func TestPathEntry(t *testing.T) {
-	a := &PathEntry{"/my/a", &ResourceInfo{"a", 1, 0, 1234}}
-	a2 := &PathEntry{"/my/a", &ResourceInfo{"a", 1, 0, 1234}}
-	b := &PathEntry{"/my/b", &ResourceInfo{"b", -1, os.ModeDir, 4566}}
+	a := &PathEntry{"/my/a", &DefaultResourceInfo{"a", 1, 0, 1234}}
+	a2 := &PathEntry{"/my/a", &DefaultResourceInfo{"a", 1, 0, 1234}}
+	b := &PathEntry{"/my/b", &DefaultResourceInfo{"b", -1, os.ModeDir, 4566}}
 
 	if a.Equals(b) {
 		t.Fatal("should not be equal")

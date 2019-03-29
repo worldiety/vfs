@@ -243,11 +243,11 @@ func (p *MountableFileSystem) Delete(path Path) error {
 }
 
 func asDirEntList(parent *virtualDir) DirEntList {
-	return NewDirEntList(int64(len(parent.children)), func(idx int64, dst *ResourceInfo) error {
+	return NewDirEntList(int64(len(parent.children)), func(idx int64, dst ResourceInfo) error {
 		child := parent.children[int(idx)]
-		dst.Size = 0
-		dst.Mode = os.ModeDir
-		dst.Name = child.name
+		dst.SetSize(0)
+		dst.SetMode(os.ModeDir)
+		dst.SetName(child.name)
 		return nil
 	})
 }
