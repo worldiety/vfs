@@ -28,8 +28,8 @@ func (f *ChRoot) Resolve(path Path) Path {
 }
 
 // Open details: see FileSystem#Open
-func (f *ChRoot) Open(path string, flag int, perm os.FileMode) (Resource, error) {
-	return f.Delegate.Open(f.Resolve(Path(path)).String(), flag, perm)
+func (f *ChRoot) Open(ctx context.Context, flag int, perm os.FileMode, path string) (Resource, error) {
+	return f.Delegate.Open(
 }
 
 // Delete details: see FileSystem#Delete

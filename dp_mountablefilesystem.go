@@ -70,10 +70,10 @@ func (p *MountableFileSystem) Link(oldPath string, newPath string, mode LinkMode
 }
 
 // Open details: see FileSystem#Open
-func (p *MountableFileSystem) Open(path string, flag int, perm os.FileMode) (Resource, error) {
+func (p *MountableFileSystem) Open(ctx context.Context, flag int, perm os.FileMode, path string) (Resource, error) {
 	_, providerPath, dp := p.Resolve(Path(path))
 	if dp != nil {
-		return dp.Open(providerPath.String(), flag, perm)
+		return dp.Open(
 	}
 	return nil, &MountPointNotFoundError{}
 }

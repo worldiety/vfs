@@ -2,12 +2,50 @@
 package vfs
 
 import (
+	"context"
 	"io"
 	"os"
+	"unicode/utf8"
 )
+
+// The PathSeparator is always / and platform independent
+const PathSeparator = "/"
+
+// The ForkSeparator is always ? and platform independent
+const ForkSeparator = "?"
+
+// The QuerySeparator is always ? and platform independent. Intentionally this is the same as the ForkSeparator.
+const QuerySeparator = ForkSeparator
+
+var unportableCharacters = []uint8{'*', '?', ':', '[', ']', '"', '<', '>', '|', '(', ')', '{', '}', '&', '\'', '!', '\\', ';', '$', 0x0}
+
+// UnportableCharacter checks the given string for unsafe characters and returns the first index of occurrence or -1.
+// This is important to exchange file names across different implementations, like windows, macos or linux.
+// In general the following characters are considered unsafe *?:[]"<>|(){}&'!\;$ and chars <= 0x1F. As a developer
+// you should check and avoid file path segments to contain any of these characters, especially because / or ? would
+// clash with the path and fork separator. If the string is found not to be a valid utf8 sequence, 0 is returned.
+func UnportableCharacter(str string) int {
+	for i := 0; i < len(str); i++ {
+		c := str[i]
+		for _, avoid := range unportableCharacters {
+			if c == avoid {
+				return i
+			}
+		}
+		if c <= 0x1F {
+			return i
+		}
+	}
+	if !utf8.ValidString(str) {
+		return 0
+	}
+	return -1
+}
 
 // A LinkMode determines at creation time the way how links are created.
 type LinkMode = int32
+
+
 
 const (
 	// SymLink writes the actual path into the file which is evaluated at runtime.
@@ -77,29 +115,39 @@ type FileSystem interface {
 	// Implementations have to create parent directories, if those do not exist. However if any existing
 	// path segment denotes already a resource, the resource is not deleted and an error is returned instead.
 	//
-	// Resource Forks or Alternate Data Streams (or e.g. thumbnails from online resources) should be simply addressed
-	// using a /. Example: /myfolder/test.png/thumb-jpg/720p. Note that this is path wise basically indistinguishable
-	// from a folder and a regular file name (which is logically correct).
-	// To make your lookups easier, you may use some kind of magic identifier
-	// like rsc or $<some id> but you should generally avoid : as used by windows because it breaks
-	// the entire path semantics and conflicts with the Unix path separator.
-	Open(path string, flag int, perm os.FileMode) (Resource, error)
+	// Resource Forks or Alternate Data Streams (or e.g. thumbnails from online resources) shall be addressed
+	// using a ?. Example: /myfolder/test.png/thumb-jpg?720p. Note that the ? is also considered to be an unportable
+	// and unsafe character but indeed it should never make it into a real local path. Instead the semantic is the
+	// same as specified by an URI and represents the query and fragment part.
+	//
+	// Do not forget to close the resource, to avoid any leak.
+	Open(ctx context.Context, flag int, perm os.FileMode, path string) (Resource, error)
 
 	// Deletes a path entry and all contained children. It is not considered an error to delete a non-existing resource.
+	// This non-posix behavior is introduced to guarantee two things:
+	//   * the implementation shall ensure that races have more consistent effects
+	//   * descending the tree and collecting all children is an expensive procedure and often unnecessary, especially
+	//     in relational databases with foreign key constraints.
 	Delete(path string) error
 
-	// Reads Attributes. Every implementation must support *ResourceInfo
+	// Reads Attributes. Every implementation must support the ResourceInfo interface. This allows structured
+	// information to pass out without going through a serialization process using the fork logic.
+	// Use cases which reads millions of attributes can be realized without any pressure on the memory subsystem.
 	ReadAttrs(path string, dest interface{}) error
 
 	// Writes Attributes. This is an optional implementation and may simply return UnsupportedOperationError.
 	WriteAttrs(path string, src interface{}) error
 
-	// ReadDir reads the contents of a directory. If path is not a directory, a ResourceNotFoundError is returned.
+	// ReadDir reads the contents of a directory. If path is not a directory, a ENOENT is returned.
 	// options can be arbitrary and at least nil options must be supported, otherwise unsupported abstraction will
-	// cause an *UnsupportedAttributesError to be returned. Using the options, the query to
-	// retrieve the directory contents can be optimized, like required fields, sorting, page size, filter etc. This
+	// cause an EUNATTR to be returned. Using the options, the query to
+	// retrieve the directory contents can be optimized, like required fields, sorting, page size, filter etc, if not
+	// already passed through the path and its potential fork or query path. This
 	// is especially important for online sources, because it also allows arbitrary queries, which are not
-	// related to a path hierarchy at all.
+	// related to a path hierarchy at all, like tokens or post data.
+	//
+	// Implementations may support additional parameters like sorting or page sizes. These parameters should be
+	// appended to the path with the QuerySeparator (URI-Style), e.g. /my/folder?type=jpg&sort=asc.
 	ReadDir(path string, options interface{}) (DirEntList, error)
 
 	// Tries to create the given path hierarchy. If path already denotes a directory nothing happens. If any path
@@ -129,7 +177,7 @@ type DirEntList interface {
 	// Next prepares the next directory entry for reading with the Scan method.
 	// It returns true on success, or false if there is no next entry or an error happened while preparing it.
 	// Err should be consulted to distinguish between the two cases.
-
+	//
 	// Every call to Scan, even the first one, must be preceded by a call to Next.
 	Next() bool
 
@@ -138,10 +186,12 @@ type DirEntList interface {
 
 	// Scan supports at least reading data into a ResourceInfo interface.
 	// Especially it is not guaranteed to fill or map into unknown
-	// structs even if the field structure is identical.
+	// structs even if the field structure is identical. It is equivalent to FileSystem#ReadAttrs but instead
+	// of performing an extra lookup, it shall use the already queried data from the iterator. This may also mean,
+	// that depending on the query options (e.g. for performance reasons) some values are missing.
 	Scan(dest interface{}) error
 
-	// Estimated amount of entries. Is -1 if unknown and you definitely have to use ForEach to collect the result.
+	// Estimated amount of entries. Is -1 if unknown and you definitely have to loop over to count.
 	// However in the meantime, Size may deliver a more correct estimation.
 	Size() int64
 
@@ -169,3 +219,6 @@ type ResourceInfo interface {
 	// ModTime returns modification time in milliseconds since epoch 1970.
 	ModTime() int64
 }
+
+
+//TODO how to perform cancellation and timeouts? context?

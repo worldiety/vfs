@@ -21,7 +21,7 @@ func (p *LocalFileSystem) Link(oldPath string, newPath string, mode LinkMode, fl
 	case HardLink:
 		return os.Link(p.Resolve(Path(oldPath)), p.Resolve(Path(newPath)))
 	default:
-		return &UnsupportedOperationError{Message: "Mode is unsupported: " + strconv.Itoa(int(mode))}
+		return NewErr().UnsupportedOperation("Mode is unsupported: " + strconv.Itoa(int(mode)))
 
 	}
 }
@@ -59,7 +59,7 @@ func (p *LocalFileSystem) MkDirs(path string) error {
 }
 
 // Open details: see FileSystem#Open
-func (p *LocalFileSystem) Open(path string, flag int, perm os.FileMode) (Resource, error) {
+func (p *LocalFileSystem) Open(ctx context.Context, flag int, perm os.FileMode, path string) (Resource, error) {
 	if flag == os.O_RDONLY {
 		return os.OpenFile(p.Resolve(Path(path)), flag, 0)
 	}
@@ -99,13 +99,13 @@ func (p *LocalFileSystem) ReadAttrs(path string, dest interface{}) error {
 		out.SetSize(info.Size())
 		return nil
 	}
-	return &UnsupportedAttributesError{Data: dest}
+	return NewErr().UnsupportedAttributes("ReadAttrs", dest)
 
 }
 
 // WriteAttrs details: see FileSystem#WriteAttrs
 func (p *LocalFileSystem) WriteAttrs(path string, src interface{}) error {
-	return &UnsupportedOperationError{Message: "WriteAttrs"}
+	return NewErr().UnsupportedOperation("WriteAttrs")
 }
 
 // ReadDir details: see FileSystem#ReadDir

@@ -37,13 +37,13 @@ func SetDefault(provider FileSystem) {
 // Read opens the given resource for reading. May optionally also implement os.Seeker. If called on a directory
 // UnsupportedOperationError is returned. Delegates to Default()#Open.
 func Read(path Path) (Resource, error) {
-	return Default().Open(path.String(), os.O_RDONLY, 0)
+	return Default().Open(
 }
 
 // Write opens the given resource for writing. Removes and recreates the file. May optionally also implement os.Seeker.
 // If elements of the path do not exist, they are created implicitly. Delegates to Default()#Open.
 func Write(path Path) (Resource, error) {
-	return Default().Open(path.String(), os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0666)
+	return Default().Open(
 }
 
 // Delete a path entry and all contained children. It is not considered an error to delete a non-existing resource.
@@ -618,4 +618,38 @@ func Equals(a ResourceInfo, b ResourceInfo) bool {
 		return false
 	}
 	return a.Name() == b.Name() && a.Size() == b.Size() && a.ModTime() == b.ModTime() && a.Mode() == b.Mode()
+}
+
+var _ NamedResources = (*DefaultNamedResources)(nil)
+
+// DefaultNamedResources is an attribute implementation to read all available kinds of alternative resources/forks/
+// datastreams.
+type DefaultNamedResources struct {
+	names []string
+}
+
+func (r *DefaultNamedResources) Names() []ResourceName {
+	return r.names
+}
+
+func (r *DefaultNamedResources) SetNames(names []ResourceName) {
+	r.names = names
+}
+
+var _ QueryOptions = (*DefaultQueryOptions)(nil)
+
+// DefaultNamedResources is an attribute implementation to read all available kinds of alternative resources/forks/
+// datastreams.
+type DefaultQueryOptions struct {
+	Select []string
+	Order  SortOrder
+	By     []string
+}
+
+func (o *DefaultQueryOptions) Projection() (fieldNames []string) {
+	return o.Select
+}
+
+func (o *DefaultQueryOptions) OrderBy() (asc SortOrder, fieldNames []string) {
+	return o.Order, o.By
 }
