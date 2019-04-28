@@ -1,0 +1,4 @@
+github.com/worldiety/jsonml v0.0.3 h1:gGsoJNd9a21UOPnVrz2gCtNgXL9bBCubYH764Uxq7tg=
+github.com/worldiety/jsonml v0.0.3/go.mod h1:BqSfRRbiN68cYornaJLRnUAXe/Tp4cTJz2/KD6ezDVE=
+github.com/worldiety/xobj v0.0.0-20190426163538-01ff3dba5c17 h1:U8aHIf/wA+dRAU7UakUPgCPy6NrIwk8Wsc8+KSyP2oM=
+github.com/worldiety/xobj v0.0.0-20190426163538-01ff3dba5c17/go.mod h1:BHVXa4cpKrfon54wD//pVegYgK+E0CIIe8eDkxPcF04=
