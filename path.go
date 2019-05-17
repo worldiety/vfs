@@ -82,7 +82,7 @@ func (p Path) NameAt(idx int) string {
 	return p.Names()[idx]
 }
 
-// Name returns the last element in this path or the empty string if this path is empty.
+// Id returns the last element in this path or the empty string if this path is empty.
 func (p Path) Name() string {
 	tmp := p.Names()
 	if len(tmp) > 0 {
@@ -160,4 +160,21 @@ func ConcatPaths(paths ...Path) Path {
 		}
 	}
 	return Path("/" + strings.Join(tmp, "/"))
+}
+
+// Resolve takes the base dir and normalizes this path and returns it.
+// E.g.
+//   1. "/my/path".Resolve("/some/thing") => /my/path
+//   2. "./my/path".Resolve("/some/thing") => /some/thing/my/path
+//   3. "my/path".Resolve("/some/thing") => /some/thing/my/path
+//   4. "my/path".Resolve("/some/thing") => /some/thing/my/path
+//   5. "my/path/../../".Resolve("/some/thing") => /some/thing
+func (p Path) Resolve(baseDir Path) Path {
+	// 1. the absolute filename case
+	if strings.HasPrefix(string(p), "/") {
+		return p.Normalize()
+	}
+
+	// any other case (2-5) needs the prefix of baseDir
+	return baseDir.Add(p).Normalize()
 }

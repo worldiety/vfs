@@ -1,6 +1,7 @@
 package vfs
 
 import (
+	"context"
 	"os"
 )
 
@@ -43,6 +44,11 @@ func (d *virtualDir) RemoveChild(name string) *namedEntry {
 	return c
 }
 
+type wrappedHandle struct {
+	handle int
+	fs     FileSystem
+}
+
 // A MountableFileSystem contains only other DataProviders mounted under a path. Mounting cross paths is not
 // supported.
 //
@@ -50,7 +56,156 @@ func (d *virtualDir) RemoveChild(name string) *namedEntry {
 //
 // If you have /my/dir/provider0 and mount /my/dir/provider0/some/dir/provider1 the existing provider0 will be removed.
 type MountableFileSystem struct {
-	root *virtualDir
+	root       *virtualDir
+	lastHandle int
+	handles    map[int]wrappedHandle
+}
+
+func (p *MountableFileSystem) wrapHandle(fs FileSystem, handle int) int {
+	if p.handles == nil {
+		p.handles = make(map[int]wrappedHandle)
+	}
+	p.lastHandle++
+	p.handles[p.lastHandle] = wrappedHandle{handle, fs}
+	return p.lastHandle
+}
+
+func (p *MountableFileSystem) unwrapHandle(handle int) wrappedHandle {
+	if p.handles == nil {
+		return wrappedHandle{}
+	}
+	return p.handles[handle]
+}
+
+func (p *MountableFileSystem) Connect(ctx context.Context, path string, options interface{}) error {
+	_, providerPath, dp, err := p.Resolve(path)
+	if err != nil {
+		return err
+	}
+	return dp.Connect(ctx, providerPath, options)
+}
+
+func (p *MountableFileSystem) Disconnect(ctx context.Context, path string) error {
+	_, providerPath, dp, err := p.Resolve(path)
+	if err != nil {
+		return err
+	}
+	return dp.Disconnect(ctx, providerPath)
+}
+
+func (p *MountableFileSystem) FireEvent(ctx context.Context, path string, event interface{}) error {
+	_, providerPath, dp, err := p.Resolve(path)
+	if err != nil {
+		return err
+	}
+	return dp.FireEvent(ctx, providerPath, event)
+}
+
+func (p *MountableFileSystem) AddListener(ctx context.Context, path string, listener ResourceListener) (handle int, err error) {
+	prefix, providerPath, dp, err := p.Resolve(path)
+	if err != nil {
+		return -1, err
+	}
+	hnd, err := dp.AddListener(ctx, providerPath, &mountpointListener{prefix, listener})
+	if err != nil {
+		return hnd, err
+	}
+	return p.wrapHandle(dp, hnd), nil
+}
+
+func (p *MountableFileSystem) RemoveListener(ctx context.Context, handle int) error {
+	unwrapped := p.unwrapHandle(handle)
+	if unwrapped.fs != nil {
+		return unwrapped.fs.RemoveListener(ctx, unwrapped.handle)
+	}
+	return nil
+}
+
+func (p *MountableFileSystem) Begin(ctx context.Context, path string, options interface{}) (context.Context, error) {
+	_, providerPath, dp, err := p.Resolve(path)
+	if err != nil {
+		return nil, err
+	}
+	txCtx, err := dp.Begin(ctx, providerPath, options)
+	if err != nil {
+		return txCtx, err
+	}
+	txCtx = context.WithValue(txCtx, hiddenPath("path"), path)
+	return txCtx, nil
+}
+
+func (p *MountableFileSystem) Commit(ctx context.Context) error {
+	if path, ok := ctx.Value(hiddenPath("path")).(string); ok {
+		_, _, dp, err := p.Resolve(path)
+		if err != nil {
+			return err
+		}
+		return dp.Commit(ctx)
+	}
+	return &DefaultError{Code: ENOMP, Message: "wrong context"}
+}
+
+func (p *MountableFileSystem) Rollback(ctx context.Context) error {
+	if path, ok := ctx.Value(hiddenPath("path")).(string); ok {
+		_, _, dp, err := p.Resolve(path)
+		if err != nil {
+			return err
+		}
+		return dp.Rollback(ctx)
+	}
+	return &DefaultError{Code: ENOMP, Message: "wrong context"}
+}
+
+func (p *MountableFileSystem) Open(ctx context.Context, path string, flag int, options interface{}) (Blob, error) {
+	panic("implement me")
+}
+
+func (p *MountableFileSystem) Delete(ctx context.Context, path string) error {
+	panic("implement me")
+}
+
+func (p *MountableFileSystem) ReadAttrs(ctx context.Context, path string, args interface{}) (Entry, error) {
+	panic("implement me")
+}
+
+func (p *MountableFileSystem) ReadForks(ctx context.Context, path string) ([]string, error) {
+	panic("implement me")
+}
+
+func (p *MountableFileSystem) WriteAttrs(ctx context.Context, path string, src interface{}) error {
+	panic("implement me")
+}
+
+func (p *MountableFileSystem) ReadBucket(ctx context.Context, path string, options interface{}) (ResultSet, error) {
+	panic("implement me")
+}
+
+func (p *MountableFileSystem) Invoke(ctx context.Context, endpoint string, args ...interface{}) (interface{}, error) {
+	panic("implement me")
+}
+
+func (p *MountableFileSystem) MkBucket(ctx context.Context, path string, options interface{}) error {
+	panic("implement me")
+}
+
+func (p *MountableFileSystem) Rename(ctx context.Context, oldPath string, newPath string) error {
+	panic("implement me")
+}
+
+func (p *MountableFileSystem) SymLink(ctx context.Context, oldPath string, newPath string) error {
+	panic("implement me")
+}
+
+func (p *MountableFileSystem) HardLink(ctx context.Context, oldPath string, newPath string) error {
+	panic("implement me")
+}
+
+func (p *MountableFileSystem) Copy(ctx context.Context, oldPath string, newPath string) error {
+	panic("implement me")
+}
+
+func (p *MountableFileSystem) String() string {
+	panic("implement me")
 }
 
 // Link details: see FileSystem:Link
@@ -143,20 +298,20 @@ func (p *MountableFileSystem) Mount(mountPoint Path, provider FileSystem) {
 }
 
 // Resolve searches the virtual structure and returns a provider and the according data or nil and empty paths
-func (p *MountableFileSystem) Resolve(path Path) (mountPoint Path, providerPath Path, provider FileSystem) {
-	names := path.Names()
+func (p *MountableFileSystem) Resolve(path string) (mountPoint string, providerPath string, provider FileSystem, err error) {
+	names := Path(path).Names()
 	parent := p.getRoot()
 	var child *namedEntry
 	for _, name := range names {
 		child = parent.ChildByName(name)
 		if child == nil {
-			return "", "", nil
+			return "", "", nil, &DefaultError{Code: ENOMP, DetailsPayload: path, Message: "mount point not found"}
 		}
 
-		mountPoint = mountPoint.Child(name)
+		mountPoint = Path(mountPoint).Child(name).String()
 		if dp, ok := child.data.(FileSystem); ok {
 			//found the mount point
-			return mountPoint, path.TrimPrefix(mountPoint), dp
+			return mountPoint, Path(path).TrimPrefix(Path(mountPoint)).String(), dp, nil
 		}
 		if vdir, ok := child.data.(*virtualDir); ok {
 			parent = vdir
@@ -164,7 +319,7 @@ func (p *MountableFileSystem) Resolve(path Path) (mountPoint Path, providerPath 
 			panic("implementation assertion")
 		}
 	}
-	return "", "", nil
+	return "", "", nil, &DefaultError{Code: ENOMP, DetailsPayload: path, Message: "mount point not found"}
 }
 
 // ReadAttrs details: see FileSystem#ReadAttrs
@@ -251,3 +406,19 @@ func asDirEntList(parent *virtualDir) DirEntList {
 		return nil
 	})
 }
+
+type mountpointListener struct {
+	prefix   string
+	delegate ResourceListener
+}
+
+func (l *mountpointListener) OnEvent(path string, event interface{}) error {
+	if l.delegate != nil {
+		p := Path(path)
+		path = Path(l.prefix).Add(Path(path)).String()
+		return l.delegate.OnEvent(path, event)
+	}
+	return nil
+}
+
+type hiddenPath string

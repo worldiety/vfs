@@ -299,7 +299,7 @@ const (
 	// Inspect the details, which are implementation specific.
 	EOVERFLOW = 75
 
-	// Name not unique on network
+	// Id not unique on network
 	//
 	// There are several operations, especially for creating resources or renaming them which may fail due to uniqueness
 	// constraints.
@@ -428,6 +428,14 @@ const (
 	EDQUOT = 122
 
 	// === non posix error codes below === //
+
+	// End Of File
+	EOF = 248
+
+	// Invalid transaction
+	//
+	// The transaction is invalid, e.g. because it has been closed already.
+	ETXINVALID = 249
 
 	// Invalid iterator
 	//
@@ -592,3 +600,6 @@ func (b errBuilder) UnsupportedOperation(msg string) *DefaultError {
 func (b errBuilder) UnsupportedAttributes(msg string, what interface{}) *DefaultError {
 	return &DefaultError{msg + ": " + reflect.TypeOf(what).String(), EUNATTR, nil, what}
 }
+
+//
+var eof = &DefaultError{Code: EOF}

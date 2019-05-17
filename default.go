@@ -565,7 +565,7 @@ func (r *DefaultResourceInfo) SetName(name string) {
 	r.name = name
 }
 
-// Name see ResourceInfo#Name
+// Id see ResourceInfo#Id
 func (r *DefaultResourceInfo) Name() string {
 	return r.name
 }
