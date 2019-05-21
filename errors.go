@@ -538,8 +538,8 @@ type wrapper interface {
 	Unwrap() error
 }
 
-// HasStatusCode inspects the wrapped hierarchy for a specific statusCode
-func HasStatusCode(err error, statusCode int) bool {
+// IsErr inspects the wrapped hierarchy for a specific statusCode
+func IsErr(err error, statusCode int) bool {
 	if e, ok := err.(Error); ok {
 		if e.StatusCode() == statusCode {
 			return true
@@ -549,7 +549,7 @@ func HasStatusCode(err error, statusCode int) bool {
 
 	if e, ok := err.(wrapper); ok {
 		// recursive search
-		return HasStatusCode(e.Unwrap(), statusCode)
+		return IsErr(e.Unwrap(), statusCode)
 	}
 
 	return false

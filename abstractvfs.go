@@ -29,7 +29,7 @@ type AbstractFileSystem struct {
 
 	FReadForks func(ctx context.Context, path string) ([]string, error)
 
-	FWriteAttrs func(ctx context.Context, path string, src interface{}) error
+	FWriteAttrs func(ctx context.Context, path string, src interface{}) (Entry,error)
 
 	FReadBucket func(ctx context.Context, path string, options interface{}) (ResultSet, error)
 
@@ -43,7 +43,7 @@ type AbstractFileSystem struct {
 
 	FHardLink func(ctx context.Context, oldPath string, newPath string) error
 
-	FCopy func(ctx context.Context, oldPath string, newPath string) error
+	FRefLink func(ctx context.Context, oldPath string, newPath string) error
 
 	FClose func() error
 
@@ -100,7 +100,7 @@ func (v *AbstractFileSystem) ReadForks(ctx context.Context, path string) ([]stri
 	return v.FReadForks(ctx, path)
 }
 
-func (v *AbstractFileSystem) WriteAttrs(ctx context.Context, path string, src interface{}) error {
+func (v *AbstractFileSystem) WriteAttrs(ctx context.Context, path string, src interface{}) (Entry, error) {
 	return v.FWriteAttrs(ctx, path, src)
 }
 
@@ -128,8 +128,8 @@ func (v *AbstractFileSystem) HardLink(ctx context.Context, oldPath string, newPa
 	return v.FHardLink(ctx, oldPath, newPath)
 }
 
-func (v *AbstractFileSystem) Copy(ctx context.Context, oldPath string, newPath string) error {
-	return v.FCopy(ctx, oldPath, newPath)
+func (v *AbstractFileSystem) RefLink(ctx context.Context, oldPath string, newPath string) error {
+	return v.FRefLink(ctx, oldPath, newPath)
 }
 
 func (v *AbstractFileSystem) Close() error {

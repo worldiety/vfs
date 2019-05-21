@@ -6,7 +6,13 @@ import (
 	"os"
 )
 
-func NewLocalVFS() {
+var LocalFileSystem FileSystem
+
+func init() {
+	LocalFileSystem = createLocalVFS()
+}
+
+func createLocalVFS() FileSystem {
 	builder := &Builder{}
 
 	vfs := builder.Details("local", 1, 0, 0).
@@ -87,6 +93,5 @@ func NewLocalVFS() {
 		// finally create the vfs
 		Create()
 
-	vfs.String()
-
+	return vfs
 }

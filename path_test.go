@@ -1,7 +1,6 @@
 package vfs
 
 import (
-	"os"
 	"testing"
 )
 
@@ -194,28 +193,3 @@ func TestPath_EndsWith(t *testing.T) {
 	}
 }
 
-func TestPathEntry(t *testing.T) {
-	a := &PathEntry{"/my/a", &DefaultResourceInfo{"a", 1, 0, 1234}}
-	a2 := &PathEntry{"/my/a", &DefaultResourceInfo{"a", 1, 0, 1234}}
-	b := &PathEntry{"/my/b", &DefaultResourceInfo{"b", -1, os.ModeDir, 4566}}
-
-	if a.Equals(b) {
-		t.Fatal("should not be equal")
-	}
-
-	if !a.Equals(a2) {
-		t.Fatal("should be equal")
-	}
-
-	if a.Equals(nil) {
-		t.Fatal("nil never equal")
-	}
-	a = nil
-	if a.Equals(nil) {
-		t.Fatal("nil never equal")
-	}
-
-	if a2.Equals("hallo") {
-		t.Fatal("other type never equal")
-	}
-}

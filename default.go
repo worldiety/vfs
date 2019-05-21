@@ -2,14 +2,15 @@ package vfs
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io"
-	"math"
 	"os"
 	"sync/atomic"
+	"time"
 )
 
-var prov FileSystem = &LocalFileSystem{}
+var prov FileSystem = LocalFileSystem
 
 // Default returns the root data provider. By default this is a vfs.LocalFileSystem. Consider to reconfigure it to
 // a vfs.MountableFileSystem which allows arbitrary prefixes (also called mount points). Use it to configure and setup
@@ -36,76 +37,73 @@ func SetDefault(provider FileSystem) {
 
 // Read opens the given resource for reading. May optionally also implement os.Seeker. If called on a directory
 // UnsupportedOperationError is returned. Delegates to Default()#Open.
-func Read(path Path) (Resource, error) {
-	return Default().Open(
+func Read(path string) (io.ReadCloser, error) {
+	return Default().Open(context.Background(), path, os.O_RDONLY, nil)
 }
 
 // Write opens the given resource for writing. Removes and recreates the file. May optionally also implement os.Seeker.
 // If elements of the path do not exist, they are created implicitly. Delegates to Default()#Open.
-func Write(path Path) (Resource, error) {
-	return Default().Open(
+func Write(path string) (io.WriteCloser, error) {
+	return Default().Open(context.Background(), path, os.O_RDWR, nil)
 }
 
 // Delete a path entry and all contained children. It is not considered an error to delete a non-existing resource.
 // Delegates to Default()#Delete.
-func Delete(path Path) error {
-	return Default().Delete(path.String())
+func Delete(path string) error {
+	return Default().Delete(context.Background(), path)
 }
 
 // ReadAttrs reads Attributes. Every implementation must support ResourceInfo. Delegates to Default()#ReadAttrs.
-func ReadAttrs(path Path, dest interface{}) error {
-	return Default().ReadAttrs(path.String(), dest)
+func ReadAttrs(path string, args interface{}) (Entry, error) {
+	return Default().ReadAttrs(context.Background(), path, args)
 }
 
 // WriteAttrs writes Attributes. This is an optional implementation and may simply return UnsupportedOperationError.
 // Delegates to Default()#WriteAttrs.
-func WriteAttrs(path Path, src interface{}) error {
-	return Default().WriteAttrs(path.String(), src)
+func WriteAttrs(path string, src interface{}) (Entry, error) {
+	return Default().WriteAttrs(context.Background(), path, src)
 }
 
 // MkDirs tries to create the given path hierarchy. If path already denotes a directory nothing happens. If any path
 // segment already refers a file, an error must be returned. Delegates to Default()#MkDirs.
-func MkDirs(path Path) error {
-	return Default().MkDirs(path.String())
+func MkDirs(path string) error {
+	return Default().MkBucket(context.Background(), path, nil)
 }
 
 // Rename moves a file from the old to the new path. If oldPath does not exist, ResourceNotFoundError is returned.
 // If newPath exists, it will be replaced. Delegates to Default()#Rename.
-func Rename(oldPath Path, newPath Path) error {
-	return Default().Rename(oldPath.String(), newPath.String())
+func Rename(oldPath string, newPath string) error {
+	return Default().Rename(context.Background(), oldPath, newPath)
 }
 
-// ReadDir is utility method to simply list a directory listing as *ResourceInfo, which is supported by all
-// DataProviders.
-func ReadDir(path Path) ([]ResourceInfo, error) {
-	res, err := Default().ReadDir(path.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-	// a little bit of premature optimization
-	expectedEntries := 0
-	if res.Size() > 0 {
-		if res.Size() > math.MaxInt32 {
-			return nil, fmt.Errorf("to many entries: %v", res.Size())
-		}
-		expectedEntries = int(res.Size())
-	}
-	list := make([]ResourceInfo, expectedEntries)[0:0]
-	for res.Next() {
-		row := &DefaultResourceInfo{}
-		err = res.Scan(row)
+// ReadBucket is a utility method to simply list a directory by querying all result set pages.
+func ReadBucket(path string) ([]Entry, error) {
+	list := make([]Entry, 10)[0:0]
+	res, err := Default().ReadBucket(context.Background(), path, nil)
+	for {
+		// got error which may be EOF or something important
 		if err != nil {
+			if IsErr(err, EOF) {
+				return list, nil
+			}
 			return list, err
 		}
-		list = append(list, row)
+
+		// no error at all, collect results
+		for i := 0; i < res.Len(); i++ {
+			list = append(list, res.ReadAttrs(i, nil))
+		}
+
+		// query next page
+		err = res.Next(context.Background())
 	}
-	return list, res.Err()
+
 }
 
-// ReadDirRecur fully reads the given directory recursively and returns entries with full qualified paths.
-func ReadDirRecur(path Path) ([]*PathEntry, error) {
+// ReadBucketRecur fully reads the given directory recursively and returns entries with full qualified paths.
+func ReadBucketRecur(path string) ([]*PathEntry, error) {
 	res := make([]*PathEntry, 0)
-	err := Walk(path, func(path Path, info ResourceInfo, err error) error {
+	err := Walk(path, func(path string, info Entry, err error) error {
 		if err != nil {
 			return err
 		}
@@ -119,46 +117,44 @@ func ReadDirRecur(path Path) ([]*PathEntry, error) {
 }
 
 // A WalkClosure is invoked for each entry in Walk, as long as no error is returned and entries are available.
-type WalkClosure func(path Path, info ResourceInfo, err error) error
+type WalkClosure func(path string, info Entry, err error) error
 
 // Walk recursively goes down the entire path hierarchy starting at the given path
-func Walk(path Path, each WalkClosure) error {
-	res, err := Default().ReadDir(path.String(), nil)
-	if err != nil {
-		return err
-	}
+func Walk(path string, each WalkClosure) error {
 
-	for res.Next() {
-		tmp := &DefaultResourceInfo{}
-		err := res.Scan(tmp)
+	res, err := Default().ReadBucket(context.Background(), path, nil)
+	for {
+
+		// got error which may be EOF or something important
 		if err != nil {
-			// the dev may decide to ignore errors and continue walking, e.g. due to permission denied
-			shouldBreak := each(path, nil, err)
-			if shouldBreak != nil {
-				return shouldBreak
+			if IsErr(err, EOF) {
+				return nil
 			}
-			return nil
-
-		}
-
-		//delegate call
-		err = each(path.Child(tmp.Name()), tmp, nil)
-		if err != nil {
+			failedEntry := AbsEntry{Id: Path(path).Name()}
+			// let the dev override any error case. If an err is turned to nil, the Walk-callee will continue
+			err = each(Path(path).Child(failedEntry.Name()).String(), failedEntry, err)
 			return err
 		}
 
-		if tmp.Mode().IsDir() {
-			return Walk(path.Child(tmp.Name()), each)
+		// no error at all, collect results
+		for i := 0; i < res.Len(); i++ {
+			entry := res.ReadAttrs(i, nil)
+			err = each(Path(path).Child(entry.Name()).String(), entry, nil)
+			if err != nil {
+				return err
+			}
 		}
-		return nil
+
+		// query next page
+		err = res.Next(context.Background())
 	}
-	return res.Err()
+
 }
 
-// A PathEntry simply provides a Path and the related ResourceInfo
+// A PathEntry simply provides a Path and the related information
 type PathEntry struct {
-	Path     Path
-	Resource ResourceInfo
+	Path  string
+	Entry Entry
 }
 
 // Equals checks for equality with another PathEntry
@@ -167,13 +163,13 @@ func (e *PathEntry) Equals(other interface{}) bool {
 		return false
 	}
 	if o, ok := other.(*PathEntry); ok {
-		return o.Path == e.Path && Equals(o.Resource, e.Resource)
+		return o.Path == e.Path && Equals(o.Entry, e.Entry)
 	}
 	return false
 }
 
 // ReadAll loads the entire resource into memory. Only use it, if you know that it fits into memory
-func ReadAll(path Path) ([]byte, error) {
+func ReadAll(path string) ([]byte, error) {
 	reader, err := Read(path)
 	if err != nil {
 		return nil, err
@@ -190,7 +186,7 @@ func ReadAll(path Path) ([]byte, error) {
 }
 
 // WriteAll just puts the given data into the path
-func WriteAll(path Path, data []byte) (int, error) {
+func WriteAll(path string, data []byte) (int, error) {
 	writer, err := Write(path)
 	if err != nil {
 		return 0, err
@@ -207,14 +203,14 @@ func WriteAll(path Path, data []byte) (int, error) {
 	return n, nil
 }
 
-// Stat simply allocates a ResourceInfo and reads it, which must be supported by all implementations.
-func Stat(path Path) (ResourceInfo, error) {
-	info := &DefaultResourceInfo{}
-	err := Default().ReadAttrs(path.String(), info)
+// Stat emulates a standard library file info contract. See also #ReadAttrs() which allows a bit more control on
+// how the call is made.
+func Stat(path string) (os.FileInfo, error) {
+	entry, err := Default().ReadAttrs(context.Background(), path, nil)
 	if err != nil {
-		return info, err
+		return nil, err
 	}
-	return info, nil
+	return entryDelegator{entry}, nil
 }
 
 // CopyOptions is used to define the process of copying.
@@ -222,16 +218,16 @@ type CopyOptions struct {
 	cancelled int32
 
 	// OnScan is called while scanning the source
-	OnScan func(obj Path, objects int64, bytes int64)
+	OnScan func(obj string, objects int64, bytes int64)
 
 	// OnCopied is called after each transferred object.
-	OnCopied func(obj Path, objectsTransferred int64, bytesTransferred int64)
+	OnCopied func(obj string, objectsTransferred int64, bytesTransferred int64)
 
 	// OnProgress is called for each file which is progress of being copied
-	OnProgress func(src Path, dst Path, bytes int64, size int64)
+	OnProgress func(src string, dst string, bytes int64, size int64)
 
 	// OnError is called if an error occurs. If an error is returned, the process is stopped and the returned error is returned.
-	OnError func(object Path, err error) error
+	OnError func(object string, err error) error
 }
 
 // Cancel is used to signal an interruption
@@ -247,37 +243,49 @@ func (o *CopyOptions) IsCancelled() bool {
 	return atomic.LoadInt32(&o.cancelled) == 1
 }
 
-func (o *CopyOptions) onProgress(src Path, dst Path, bytes int64, size int64) {
+func (o *CopyOptions) onProgress(src string, dst string, bytes int64, size int64) {
 	if o == nil || o.OnProgress == nil {
 		return
 	}
 	o.OnProgress(src, dst, bytes, size)
 }
 
-func (o *CopyOptions) onScan(obj Path, objects int64, bytes int64) {
+func (o *CopyOptions) onScan(obj string, objects int64, bytes int64) {
 	if o == nil || o.OnScan == nil {
 		return
 	}
 	o.OnScan(obj, objects, bytes)
 }
 
-func (o *CopyOptions) onCopied(obj Path, objectsTransferred int64, bytesTransferred int64) {
+func (o *CopyOptions) onCopied(obj string, objectsTransferred int64, bytesTransferred int64) {
 	if o == nil || o.OnCopied == nil {
 		return
 	}
 	o.OnCopied(obj, objectsTransferred, bytesTransferred)
 }
 
-func (o *CopyOptions) onError(object Path, err error) error {
+func (o *CopyOptions) onError(object string, err error) error {
 	if o == nil || o.OnError == nil {
 		return err
 	}
 	return o.OnError(object, err)
 }
 
+// size inspects the given entry and returns something which looks like a size. Returns a negative number, if unknown.
+func size(entry Entry) int64 {
+	if sizer, ok := entry.(interface{ Size() int64 }); ok {
+		return sizer.Size()
+	}
+	if lengther, ok := entry.(interface{ Length() int64 }); ok {
+		return lengther.Length()
+	}
+	return -1
+}
+
 // Copy performs a copy from src to dst. Dst is always removed and replaced with the contents of src.
-// The copy options can be nil and can be used to get detailed information on the progress
-func Copy(src Path, dst Path, options *CopyOptions) error {
+// The copy options can be nil and can be used to get detailed information on the progress. The implementation
+// tries to use RefLink if possible.
+func Copy(src string, dst string, options *CopyOptions) error {
 
 	// first try to stat
 	info, err := Stat(src)
@@ -291,21 +299,25 @@ func Copy(src Path, dst Path, options *CopyOptions) error {
 		return err
 	}
 
-	if info.Mode().IsDir() {
+	if info.IsDir() {
 		var objectsFound int64
 		var bytesFound int64
 		var objectsProcessed int64
 		var bytesProcessed int64
 		// collect info
 		list := make([]*PathEntry, 0)
-		err = Walk(src, func(path Path, info ResourceInfo, err error) error {
+		err = Walk(src, func(path string, info Entry, err error) error {
 			if err != nil {
 				return options.onError(path, err)
 			}
 			list = append(list, &PathEntry{path, info})
 			objectsFound++
-			if info.Mode().IsRegular() {
-				bytesFound += info.Size()
+			if !info.IsDir() {
+				len := size(info)
+				if len > 0 {
+					bytesFound += len
+				}
+
 			}
 			options.onScan(path, objectsFound, bytesFound)
 			return nil
@@ -317,32 +329,32 @@ func Copy(src Path, dst Path, options *CopyOptions) error {
 
 		//walk through, directory are first
 		for _, entry := range list {
-			dstPath := ConcatPaths(dst, entry.Path.TrimPrefix(src))
-			if entry.Resource.Mode().IsDir() {
-				err := MkDirs(dstPath)
+			dstPath := ConcatPaths(Path(dst), Path(entry.Path).TrimPrefix(Path(src)))
+			if entry.Entry.IsDir() {
+				err := MkDirs(dstPath.String())
 				if err != nil {
-					err = options.onError(dstPath, err)
+					err = options.onError(dstPath.String(), err)
 					if err != nil {
 						return err
 					}
 				}
 				objectsProcessed++
 				options.onCopied(entry.Path, objectsProcessed, bytesProcessed)
-			} else if entry.Resource.Mode().IsRegular() {
+			} else if !entry.Entry.IsDir() {
 				reader, err := Read(entry.Path)
 				if err != nil {
 					return err
 				}
-				writer, err := Write(dstPath)
+				writer, err := Write(dstPath.String())
 				if err != nil {
 					silentClose(reader)
 					return err
 				}
-				written, err := copyBuffer(entry.Path, dstPath, entry.Resource.Size(), reader, writer, nil, options)
+				written, err := copyBuffer(entry.Path, dstPath.String(), size(entry.Entry), reader, writer, nil, options)
 				silentClose(reader)
 				silentClose(writer)
 				if err != nil {
-					err = options.onError(dstPath, err)
+					err = options.onError(dstPath.String(), err)
 					if err != nil {
 						return err
 					}
@@ -383,14 +395,14 @@ func Copy(src Path, dst Path, options *CopyOptions) error {
 
 }
 
-func copyBuffer(srcPath Path, dstPath Path, totalSize int64, src io.Reader, dst io.Writer, buf []byte, options *CopyOptions) (written int64, err error) {
+func copyBuffer(srcPath string, dstPath string, totalSize int64, src io.Reader, dst io.Writer, buf []byte, options *CopyOptions) (written int64, err error) {
 	if buf == nil {
 		size := 32 * 1024
 		buf = make([]byte, size)
 	}
 	for {
 		if options.IsCancelled() {
-			err = &CancellationError{}
+			err = &DefaultError{Code: EINTR}
 			break
 		}
 
@@ -420,236 +432,48 @@ func copyBuffer(srcPath Path, dstPath Path, totalSize int64, src io.Reader, dst 
 	return written, err
 }
 
-// A genericDirEntList is a simple implementation for fixed size result sets providing only *ResourceInfo targets.
-type genericDirEntList struct {
-	currentIdx int64
-	count      int64
-	getAt      func(idx int64, dst ResourceInfo) error
-}
-
-func (d *genericDirEntList) Next() bool {
-	if d.currentIdx < d.count {
-		d.currentIdx++
-		return true
-	}
-	return false
-}
-
-// Err never returns an error, because the count is known at construction time, and seeking errors cannot occur.
-func (d *genericDirEntList) Err() error {
-	return nil
-}
-
-func (d *genericDirEntList) Scan(dest interface{}) error {
-	if out, ok := dest.(ResourceInfo); ok {
-		if d.currentIdx >= d.count {
-			return d.getAt(d.count-1, out)
-		}
-		return d.getAt(d.currentIdx-1, out)
-	}
-	return &UnsupportedAttributesError{dest, nil}
-}
-
-func (d *genericDirEntList) Size() int64 {
-	return d.count
-}
-
-func (d *genericDirEntList) Close() error {
-	return nil
-}
-
-// NewDirEntList is a utility function to simply wrap a function into a lazy DirEntList implementation
-func NewDirEntList(size int64, getter func(idx int64, dst ResourceInfo) error) DirEntList {
-	return &genericDirEntList{0, size, getter}
-}
-
-// NewResourceFromReader wraps a reader and returns a Resource implementation which only delegates the Read method
-// and only supports limited (forward) Seek support by just discarding 1 byte after another.
-// Delegates also the Close call, if reader also implements Closeable.
-func NewResourceFromReader(reader io.Reader) Resource {
-	return &resourceReader{reader}
-}
-
-type resourceReader struct {
-	delegate io.Reader
-}
-
-func (r *resourceReader) ReadAt(b []byte, off int64) (n int, err error) {
-	return 0, &UnsupportedOperationError{}
-}
-
-func (r *resourceReader) Read(p []byte) (n int, err error) {
-	return r.delegate.Read(p)
-}
-
-func (r *resourceReader) WriteAt(b []byte, off int64) (n int, err error) {
-	return 0, &UnsupportedOperationError{}
-}
-
-func (r *resourceReader) Write(p []byte) (n int, err error) {
-	return 0, &UnsupportedOperationError{}
-}
-
-func (r *resourceReader) Seek(offset int64, whence int) (int64, error) {
-	if whence == io.SeekCurrent && offset >= 0 {
-		count := int64(0)
-		tmp := make([]byte, 1)
-		for i := int64(0); i < offset; i++ {
-			n, err := r.delegate.Read(tmp)
-			count += int64(n)
-			if err != nil {
-				return count, err
-			}
-		}
-		return count, nil
-	}
-	return 0, &UnsupportedOperationError{}
-}
-
-func (r *resourceReader) Close() error {
-	if closer, ok := r.delegate.(io.Closer); ok {
-		return closer.Close()
-	}
-	return nil
-}
-
-// NewResourceFromWriter wraps a writer and returns a Resource implementation which only delegates the Write method.
-// Delegates also the Close call, if writer also implements Closeable.
-func NewResourceFromWriter(writer io.Writer) Resource {
-	return &resourceWriter{writer}
-}
-
-type resourceWriter struct {
-	delegate io.Writer
-}
-
-func (r *resourceWriter) ReadAt(b []byte, off int64) (n int, err error) {
-	return 0, &UnsupportedOperationError{}
-}
-
-func (r *resourceWriter) Read(p []byte) (n int, err error) {
-	return 0, &UnsupportedOperationError{}
-}
-
-func (r *resourceWriter) WriteAt(b []byte, off int64) (n int, err error) {
-	return 0, &UnsupportedOperationError{}
-}
-
-func (r *resourceWriter) Write(p []byte) (n int, err error) {
-	return r.delegate.Write(p)
-}
-
-func (r *resourceWriter) Seek(offset int64, whence int) (int64, error) {
-	return 0, &UnsupportedOperationError{}
-}
-
-func (r *resourceWriter) Close() error {
-	if closer, ok := r.delegate.(io.Closer); ok {
-		return closer.Close()
-	}
-	return nil
-}
-
-var _ ResourceInfo = (*DefaultResourceInfo)(nil)
-
-// A DefaultResourceInfo is the default implementation of the ResourceInfo interface
-type DefaultResourceInfo struct {
-	name    string
-	size    int64
-	mode    os.FileMode
-	modTime int64
-}
-
-// SetName see ResourceInfo#SetName
-func (r *DefaultResourceInfo) SetName(name string) {
-	r.name = name
-}
-
-// Id see ResourceInfo#Id
-func (r *DefaultResourceInfo) Name() string {
-	return r.name
-}
-
-// SetSize see ResourceInfo#SetSize
-func (r *DefaultResourceInfo) SetSize(size int64) {
-	r.size = size
-}
-
-// Size see ResourceInfo#Size
-func (r *DefaultResourceInfo) Size() int64 {
-	return r.size
-}
-
-// SetMode see ResourceInfo#SetMode
-func (r *DefaultResourceInfo) SetMode(mode os.FileMode) {
-	r.mode = mode
-}
-
-// Mode see ResourceInfo#Mode
-func (r *DefaultResourceInfo) Mode() os.FileMode {
-	return r.mode
-}
-
-// SetModTime see ResourceInfo#SetModTime
-func (r *DefaultResourceInfo) SetModTime(time int64) {
-	r.modTime = time
-}
-
-// ModTime see ResourceInfo#ModTime
-func (r *DefaultResourceInfo) ModTime() int64 {
-	return r.modTime
-}
-
-// Equals checks for equality with another PathEntry
-func (r *DefaultResourceInfo) Equals(other interface{}) bool {
-	if r == nil || other == nil {
-		return false
-	}
-	if o, ok := other.(DefaultResourceInfo); ok {
-		return o.name == r.name && o.size == r.size && o.modTime == r.modTime && o.mode == r.mode
-	}
-	return false
-}
-
-// Equals returns true if the values defined by ResourceInfo are equal.
-// However it does not inspect or check other fields or values.
-func Equals(a ResourceInfo, b ResourceInfo) bool {
+// Equals returns true if the values defined by Entry are equal.
+// However it does not inspect or check other fields or values, especially not Sys()
+func Equals(a Entry, b Entry) bool {
 	if a == nil || b == nil {
 		return false
 	}
-	return a.Name() == b.Name() && a.Size() == b.Size() && a.ModTime() == b.ModTime() && a.Mode() == b.Mode()
+	return a.Name() == b.Name() && a.IsDir() == b.IsDir()
 }
 
-var _ NamedResources = (*DefaultNamedResources)(nil)
-
-// DefaultNamedResources is an attribute implementation to read all available kinds of alternative resources/forks/
-// datastreams.
-type DefaultNamedResources struct {
-	names []string
+type entryDelegator struct {
+	entry Entry
 }
 
-func (r *DefaultNamedResources) Names() []ResourceName {
-	return r.names
+func (e entryDelegator) Name() string {
+	return e.entry.Name()
 }
 
-func (r *DefaultNamedResources) SetNames(names []ResourceName) {
-	r.names = names
+func (e entryDelegator) Size() int64 {
+	if sizer, ok := e.entry.(interface{ Size() int64 }); ok {
+		return sizer.Size()
+	}
+	return -1
 }
 
-var _ QueryOptions = (*DefaultQueryOptions)(nil)
-
-// DefaultNamedResources is an attribute implementation to read all available kinds of alternative resources/forks/
-// datastreams.
-type DefaultQueryOptions struct {
-	Select []string
-	Order  SortOrder
-	By     []string
+func (e entryDelegator) Mode() os.FileMode {
+	if e.entry.IsDir() {
+		return os.ModeDir
+	}
+	return 0 //regular
 }
 
-func (o *DefaultQueryOptions) Projection() (fieldNames []string) {
-	return o.Select
+func (e entryDelegator) ModTime() time.Time {
+	if timer, ok := e.entry.(interface{ ModTime() time.Time }); ok {
+		return timer.ModTime()
+	}
+	return time.Unix(0, 0)
 }
 
-func (o *DefaultQueryOptions) OrderBy() (asc SortOrder, fieldNames []string) {
-	return o.Order, o.By
+func (e entryDelegator) IsDir() bool {
+	return e.entry.IsDir()
+}
+
+func (e entryDelegator) Sys() interface{} {
+	return e.entry.Sys()
 }

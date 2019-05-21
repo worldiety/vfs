@@ -197,7 +197,7 @@ type FileSystem interface {
 	//
 	// Do not forget to close the resource, to avoid any leak.
 	// Implementations may reject this operation permanently with ENOSYS error.
-	Open(ctx context.Context, path string, flag int, options interface{}) (Blob, error)
+	Open(ctx context.Context, path string, flags int, options interface{}) (Blob, error)
 
 	// Deletes a path entry and all contained children. It is not considered an error to delete a non-existing resource.
 	// This non-posix behavior is introduced to guarantee two things:
@@ -240,10 +240,13 @@ type FileSystem interface {
 	// Implementations may reject this operation permanently with ENOSYS error.
 	ReadForks(ctx context.Context, path string) ([]string, error)
 
-	// WriteAttrs inserts or updates properties or extended attributes with key/value primitives,
-	// suitable for json serialization.
+	// WriteAttrs inserts or updates properties or extended attributes e.g. with key/value primitives,
+	// suitable for json serialization. Optionally an implementation may return an Entry, e.g. if the id or name
+	// has changed or if the information comes for free.
+	// So keep in mind, that even if no error is returned, the entry may still be nil.
+	//
 	// Implementations may reject this operation permanently with ENOSYS error.
-	WriteAttrs(ctx context.Context, path string, src interface{}) error
+	WriteAttrs(ctx context.Context, path string, src interface{}) (Entry, error)
 
 	// ReadBucket reads the contents of a directory. If path is not a bucket, an ENOENT is returned.
 	// options can be arbitrary primitives and should be json serializable.
@@ -321,11 +324,11 @@ type FileSystem interface {
 	// Implementations may reject this operation permanently with ENOSYS error.
 	HardLink(ctx context.Context, oldPath string, newPath string) error
 
-	// Copy tries to perform a copy from old to new using the most efficient possible way, e.g. by using
+	// RefLink tries to perform a copy from old to new using the most efficient possible way, e.g. by using
 	// reference links. Implementations may reject this operation permanently with ENOSYS error. If oldPath and/or
 	// newPath refer to buckets and the backend does not support that operations for buckets, EISDIR error is returned
 	// or vice versa ENOTDIR if only buckets are supported.
-	Copy(ctx context.Context, oldPath string, newPath string) error
+	RefLink(ctx context.Context, oldPath string, newPath string) error
 
 	// Close when Done to release resources. Subsequent calls have no effect and do not report additional errors.
 	// An implementation may reject closing while still in process, so future calls may be necessary.
@@ -378,7 +381,7 @@ type Entry interface {
 	// with #ReadBucket()
 	IsDir() bool
 
-	// Data returns the implementation specific payload. This can be anything, e.g. a map[string]interface{} or
+	// Sys returns the implementation specific payload. This can be anything, e.g. a map[string]interface{} or
 	// a distinct struct.
 	Sys() interface{}
 }

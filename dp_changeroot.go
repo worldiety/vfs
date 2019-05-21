@@ -70,7 +70,7 @@ func (f *ChRoot) ReadForks(ctx context.Context, path string) ([]string, error) {
 	return f.Delegate.ReadForks(ctx, f.Resolve(path))
 }
 
-func (f *ChRoot) WriteAttrs(ctx context.Context, path string, src interface{}) error {
+func (f *ChRoot) WriteAttrs(ctx context.Context, path string, src interface{}) (Entry, error) {
 	return f.Delegate.WriteAttrs(ctx, f.Resolve(path), src)
 }
 
@@ -98,8 +98,8 @@ func (f *ChRoot) HardLink(ctx context.Context, oldPath string, newPath string) e
 	return f.Delegate.HardLink(ctx, f.Resolve(oldPath), f.Resolve(newPath))
 }
 
-func (f *ChRoot) Copy(ctx context.Context, oldPath string, newPath string) error {
-	return f.Delegate.Copy(ctx, f.Resolve(oldPath), f.Resolve(newPath))
+func (f *ChRoot) RefLink(ctx context.Context, oldPath string, newPath string) error {
+	return f.Delegate.RefLink(ctx, f.Resolve(oldPath), f.Resolve(newPath))
 }
 
 func (f *ChRoot) String() string {

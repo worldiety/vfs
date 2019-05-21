@@ -102,6 +102,7 @@ func (p Path) Parent() Path {
 
 // String normalizes the slashes in Path
 func (p Path) String() string {
+	// TODO check if normalization is actually a good idea and least avoid it if unnecessary
 	return "/" + strings.Join(p.Names(), "/")
 }
 

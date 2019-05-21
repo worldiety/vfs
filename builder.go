@@ -128,8 +128,8 @@ func (b *Builder) ensureInit() {
 			return nil, newENOSYS("ReadForks not supported", b.debugName())
 		}
 
-		b.vfs.FWriteAttrs = func(ctx context.Context, path string, src interface{}) error {
-			return newENOSYS("WriteAttrs not supported", b.debugName())
+		b.vfs.FWriteAttrs = func(ctx context.Context, path string, src interface{}) (Entry, error) {
+			return nil, newENOSYS("WriteAttrs not supported", b.debugName())
 		}
 
 		b.vfs.FReadBucket = func(ctx context.Context, path string, options interface{}) (set ResultSet, e error) {
@@ -156,8 +156,8 @@ func (b *Builder) ensureInit() {
 			return newENOSYS("HardLink not supported", b.debugName())
 		}
 
-		b.vfs.FCopy = func(ctx context.Context, oldPath string, newPath string) error {
-			return newENOSYS("Copy not supported", b.debugName())
+		b.vfs.FRefLink = func(ctx context.Context, oldPath string, newPath string) error {
+			return newENOSYS("RefLink not supported", b.debugName())
 		}
 		b.vfs.FString = func() string {
 			return "AbstractVirtualFilesystem"
@@ -550,7 +550,7 @@ func (r *entryResultSet) ReadAttrs(idx int, args interface{}) Entry {
 		return AbsMapEntry(t)
 	case *AbsEntry:
 		t.Id = entry.Id
-		t.Size = entry.Size
+		t.Length = entry.Length
 		t.IsBucket = entry.IsBucket
 		t.Data = entry.Data
 		return t
