@@ -22,7 +22,7 @@ func (f *ChRoot) Resolve(path string) string {
 	return f.Prefix.Add(Path(path).Normalize()).String()
 }
 
-func (f *ChRoot) Connect(ctx context.Context, path string, options interface{}) error {
+func (f *ChRoot) Connect(ctx context.Context, path string, options interface{}) (interface{}, error) {
 	return f.Delegate.Connect(ctx, f.Resolve(path), options)
 }
 

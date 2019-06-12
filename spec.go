@@ -10,12 +10,6 @@ import (
 // The PathSeparator is always / and platform independent
 const PathSeparator = "/"
 
-// The ForkSeparator is always ? and platform independent
-const ForkSeparator = "?"
-
-// The QuerySeparator is always ? and platform independent. Intentionally this is the same as the ForkSeparator.
-const QuerySeparator = ForkSeparator
-
 var unportableCharacters = []uint8{'*', '?', ':', '[', ']', '"', '<', '>', '|', '(', ')', '{', '}', '&', '\'', '!', '\\', ';', '$', 0x0}
 
 // UnportableCharacter checks the given string for unsafe characters and returns the first index of occurrence or -1.
@@ -134,7 +128,7 @@ type FileSystem interface {
 	//  }
 	//
 	// Implementations may reject this operation permanently with ENOSYS error.
-	Connect(ctx context.Context, path string, options interface{}) error
+	Connect(ctx context.Context, path string, options interface{}) (interface{}, error)
 
 	// Disconnect terminates the internal state of authentication and authorization, e.g. by destroying a refresh
 	// token or a session at the remote side.
@@ -316,9 +310,9 @@ type FileSystem interface {
 	// Implementations may reject this operation permanently with ENOSYS error.
 	SymLink(ctx context.Context, oldPath string, newPath string) error
 
-	// HardLink tries to create a new named entry for an existing resource. Changes to one of both named entries
+	// HardLink tries to create a new named entry for an existing resource. Changes to one of both named Entries
 	// are reflected vice versa, however due to eventual consistency it may take some time to become visible.
-	// To remove the resource, one has to remove all named entries.
+	// To remove the resource, one has to remove all named Entries.
 	// Implementations may support this for buckets or blobs differently and will return ENOTDIR or EISDIR to
 	// give insight. If newPath already exists EEXIST is returned.
 	// Implementations may reject this operation permanently with ENOSYS error.
@@ -338,8 +332,8 @@ type FileSystem interface {
 	String() string
 }
 
-// An EntryList is a collection of loaded bucket entries, whose entries are typically the names of other
-// Buckets or entries. We do not include the ReadForks method, because the determination of available forks
+// An EntryList is a collection of loaded bucket Entries, whose Entries are typically the names of other
+// Buckets or Entries. We do not include the ReadForks method, because the determination of available forks
 // may be expensive and usually requires additional I/O. Logically it belongs to the FileSystem#Open() call
 // and is therefore not related to the ResultSet.
 type ResultSet interface {
@@ -350,10 +344,10 @@ type ResultSet interface {
 	// See also FileSystem#ReadAttrs()
 	ReadAttrs(idx int, args interface{}) Entry
 
-	// Len returns the amount of entries in the entire result set, which are available without any further I/O
+	// Len returns the amount of Entries in the entire result set, which are available without any further I/O
 	Len() int
 
-	// Total is the estimated amount of all entries when all pages have been requested.
+	// Total is the estimated amount of all Entries when all pages have been requested.
 	// Is -1 if unknown and you definitely have to loop over to count.
 	// However in the meantime, Size may deliver a more correct estimation.
 	Total() int64

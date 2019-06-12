@@ -18,12 +18,12 @@ func createLocalVFS() FileSystem {
 	vfs := builder.Details("local", 1, 0, 0).
 		// bucket listing
 		MatchBucket("/").
-		OnList(func(path Path) ([]AbsEntry, error) {
+		OnList(func(path Path) ([]*DefaultEntry, error) {
 			files, err := ioutil.ReadDir(path.String())
 			if err != nil {
 				return nil, err
 			}
-			res := make([]AbsEntry, len(files))
+			res := make([]*DefaultEntry, len(files))
 			for i, f := range files {
 				res[i].Id = f.Name()
 				res[i].Length = f.Size()
@@ -38,7 +38,7 @@ func createLocalVFS() FileSystem {
 			return os.RemoveAll(path.String())
 		}).
 		// generic (fallback) read attributes
-		ReadEntryAttrs(func(ctx context.Context, path Path, dst *AbsEntry) error {
+		ReadEntryAttrs(func(ctx context.Context, path Path, dst *DefaultEntry) error {
 			stat, err := os.Stat(path.String())
 			if err != nil {
 				return err

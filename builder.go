@@ -5,7 +5,6 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"reflect"
 	"strconv"
 )
 
@@ -63,15 +62,15 @@ func (b *Builder) ensureInit() {
 	if b.vfs == nil {
 		b.vfs = &AbstractFileSystem{}
 		b.listeners = make(map[int]*builderPathListener)
-		b.vfs.FConnect = func(ctx context.Context, options interface{}) error {
-			return newENOSYS("Connect not supported", b.debugName())
+		b.vfs.FConnect = func(ctx context.Context, options interface{}) (interface{}, error) {
+			return nil,NewENOSYS("Connect not supported", b.debugName())
 		}
 		b.vfs.FClose = func() error {
 			return nil // intentionally always no-op
 		}
 
 		b.vfs.FDisconnect = func(ctx context.Context) error {
-			return newENOSYS("Disconnect not supported", b.debugName())
+			return NewENOSYS("Disconnect not supported", b.debugName())
 		}
 
 		b.vfs.FRemoveListener = func(ctx context.Context, handle int) error {
@@ -101,63 +100,63 @@ func (b *Builder) ensureInit() {
 		}
 
 		b.vfs.FBegin = func(ctx context.Context, options interface{}) (i context.Context, e error) {
-			return nil, newENOSYS("Begin transaction not supported", b.debugName())
+			return nil, NewENOSYS("Begin transaction not supported", b.debugName())
 		}
 
 		b.vfs.FCommit = func(ctx context.Context) error {
-			return newENOSYS("Commit transaction not supported", b.debugName())
+			return NewENOSYS("Commit transaction not supported", b.debugName())
 		}
 
 		b.vfs.FRollback = func(ctx context.Context) error {
-			return newENOSYS("Rollback transaction not supported", b.debugName())
+			return NewENOSYS("Rollback transaction not supported", b.debugName())
 		}
 
 		b.vfs.FOpen = func(ctx context.Context, path string, flag int, options interface{}) (blob Blob, e error) {
-			return nil, newENOSYS("Open not supported", b.debugName())
+			return nil, NewENOSYS("Open not supported", b.debugName())
 		}
 
 		b.vfs.FDelete = func(ctx context.Context, path string) error {
-			return newENOSYS("Delete not supported", b.debugName())
+			return NewENOSYS("Delete not supported", b.debugName())
 		}
 
 		b.vfs.FReadAttrs = func(ctx context.Context, path string, options interface{}) (Entry, error) {
-			return nil, newENOSYS("ReadAttrs not supported", b.debugName())
+			return nil, NewENOSYS("ReadAttrs not supported", b.debugName())
 		}
 
 		b.vfs.FReadForks = func(ctx context.Context, path string) (strings []string, e error) {
-			return nil, newENOSYS("ReadForks not supported", b.debugName())
+			return nil, NewENOSYS("ReadForks not supported", b.debugName())
 		}
 
 		b.vfs.FWriteAttrs = func(ctx context.Context, path string, src interface{}) (Entry, error) {
-			return nil, newENOSYS("WriteAttrs not supported", b.debugName())
+			return nil, NewENOSYS("WriteAttrs not supported", b.debugName())
 		}
 
 		b.vfs.FReadBucket = func(ctx context.Context, path string, options interface{}) (set ResultSet, e error) {
-			return nil, newENOSYS("ReadBucket not supported", b.debugName())
+			return nil, NewENOSYS("ReadBucket not supported", b.debugName())
 		}
 
 		b.vfs.FInvoke = func(ctx context.Context, endpoint string, args ...interface{}) (i interface{}, e error) {
-			return nil, newENOSYS("Invoke not supported", b.debugName())
+			return nil, NewENOSYS("Invoke not supported", b.debugName())
 		}
 
 		b.vfs.FMkBucket = func(ctx context.Context, path string, options interface{}) error {
-			return newENOSYS("MkBucket not supported", b.debugName())
+			return NewENOSYS("MkBucket not supported", b.debugName())
 		}
 
 		b.vfs.FRename = func(ctx context.Context, oldPath string, newPath string) error {
-			return newENOSYS("Rename not supported", b.debugName())
+			return NewENOSYS("Rename not supported", b.debugName())
 		}
 
 		b.vfs.FSymLink = func(ctx context.Context, oldPath string, newPath string) error {
-			return newENOSYS("SymLink not supported", b.debugName())
+			return NewENOSYS("SymLink not supported", b.debugName())
 		}
 
 		b.vfs.FHardLink = func(ctx context.Context, oldPath string, newPath string) error {
-			return newENOSYS("HardLink not supported", b.debugName())
+			return NewENOSYS("HardLink not supported", b.debugName())
 		}
 
 		b.vfs.FRefLink = func(ctx context.Context, oldPath string, newPath string) error {
-			return newENOSYS("RefLink not supported", b.debugName())
+			return NewENOSYS("RefLink not supported", b.debugName())
 		}
 		b.vfs.FString = func() string {
 			return "AbstractVirtualFilesystem"
@@ -328,13 +327,13 @@ func (b *Builder) MkBucket(f func(ctx context.Context, path Path, options interf
 	return b
 }
 
-func (b *Builder) ReadEntryAttrs(f func(ctx context.Context, path Path, dst *AbsEntry) error) *Builder {
+func (b *Builder) ReadEntryAttrs(f func(ctx context.Context, path Path, dst *DefaultEntry) error) *Builder {
 	b.fallbackReadAttrs = func(_ctx context.Context, _path string, _dst interface{}) (Entry, error) {
 		switch t := _dst.(type) {
-		case *AbsEntry:
+		case *DefaultEntry:
 			return t, f(_ctx, Path(_path), t)
 		case map[string]interface{}:
-			tmp := &AbsEntry{}
+			tmp := &DefaultEntry{}
 			err := f(_ctx, Path(_path), tmp)
 			if err != nil {
 				return nil, err
@@ -406,7 +405,7 @@ func (b *BlobBuilder) OnRead(open func(context.Context, Path) (io.Reader, error)
 		if err != nil {
 			return nil, err
 		}
-		return blobWrapper{reader}, nil
+		return &BlobAdapter{reader}, nil
 	}
 	b.open = nil
 	return b
@@ -418,7 +417,7 @@ func (b *BlobBuilder) OnWrite(open func(context.Context, Path) (io.Writer, error
 		if err != nil {
 			return nil, err
 		}
-		return blobWrapper{writer}, nil
+		return &BlobAdapter{writer}, nil
 	}
 	b.open = nil
 	return b
@@ -464,16 +463,16 @@ func (b *BucketBuilder) MatchAlso(pattern string) *BucketBuilder {
 	return b
 }
 
-// OnList configures the generic call to ReadBucket, which is either nil, *AbsEntry or map[string]interface{}.
+// OnList configures the generic call to ReadBucket, which is either nil, *DefaultEntry or map[string]interface{}.
 // In any other case ReadBucket will return map[string]interface{} with the 3 fields n,s and b which
 // contains name, size and the isBucket flag.
-func (b *BucketBuilder) OnList(transformation func(Path) ([]AbsEntry, error)) *BucketBuilder {
+func (b *BucketBuilder) OnList(transformation func(Path) ([]*DefaultEntry, error)) *BucketBuilder {
 	b.onRead = func(context context.Context, path string, options interface{}) (ResultSet, error) {
 		entries, err := transformation(Path(path))
 		if err != nil {
 			return nil, err
 		}
-		return &entryResultSet{entries}, nil
+		return &DefaultResultSet{entries}, nil
 	}
 	return b
 }
@@ -511,127 +510,4 @@ func (a AbsMapEntry) Size() int64 {
 	return a[mapEntrySize].(int64)
 }
 
-// AbsEntry is a minimal type, especially used by VFS instances created by Builder
-type AbsEntry struct {
-	Id       string      // Id must be at least unique per bucket
-	IsBucket bool        // IsBucket denotes the directory or folder flag
-	Length   int64       // Length in bytes, if unknown set to -1
-	Data     interface{} // Data is the original payload, if any, otherwise nil
-}
-
-func (a AbsEntry) Name() string {
-	return a.Id
-}
-
-func (a AbsEntry) IsDir() bool {
-	return a.IsBucket
-}
-
-func (a AbsEntry) Sys() interface{} {
-	return a.Data
-}
-
-func (a AbsEntry) Size() int64 {
-	return a.Length
-}
-
-type entryResultSet struct {
-	entries []AbsEntry
-}
-
-func (r *entryResultSet) ReadAttrs(idx int, args interface{}) Entry {
-	entry := r.entries[idx]
-	switch t := args.(type) {
-	case map[string]interface{}:
-		t[mapEntryName] = entry.Id
-		t[mapEntrySize] = entry.Size
-		t[mapEntryIsDir] = entry.IsBucket
-		t[mapEntrySys] = entry.Data
-		return AbsMapEntry(t)
-	case *AbsEntry:
-		t.Id = entry.Id
-		t.Length = entry.Length
-		t.IsBucket = entry.IsBucket
-		t.Data = entry.Data
-		return t
-	default:
-		return r.ReadAttrs(idx, make(map[string]interface{}))
-	}
-}
-
-func (r *entryResultSet) Len() int {
-	return len(r.entries)
-}
-
-func (r *entryResultSet) Total() int64 {
-	return int64(r.Len())
-}
-
-func (r *entryResultSet) Pages() int64 {
-	return 1
-}
-
-func (r *entryResultSet) Next(ctx context.Context) error {
-	return eof
-}
-
-// Data always returns []AbsEntry
-func (r *entryResultSet) Sys() interface{} {
-	return r.entries
-}
-
 //==
-
-type blobWrapper struct {
-	delegate interface{}
-}
-
-func (d blobWrapper) ReadAt(b []byte, off int64) (n int, err error) {
-	if reader, ok := d.delegate.(io.ReaderAt); ok {
-		return reader.ReadAt(b, off)
-	}
-	return 0, newENOSYS("ReadAt not supported", d)
-}
-
-func (d blobWrapper) Read(p []byte) (n int, err error) {
-	if reader, ok := d.delegate.(io.Reader); ok {
-		return reader.Read(p)
-	}
-	return 0, newENOSYS("Read not supported", d)
-}
-
-func (d blobWrapper) WriteAt(b []byte, off int64) (n int, err error) {
-	if writer, ok := d.delegate.(io.WriterAt); ok {
-		return writer.WriteAt(b, off)
-	}
-	return 0, newENOSYS("WriteAt not supported", d)
-}
-
-func (d blobWrapper) Write(p []byte) (n int, err error) {
-	if writer, ok := d.delegate.(io.Writer); ok {
-		return writer.Write(p)
-	}
-	return 0, newENOSYS("Write not supported", d)
-}
-
-func (d blobWrapper) Seek(offset int64, whence int) (int64, error) {
-	if seeker, ok := d.delegate.(io.Seeker); ok {
-		return seeker.Seek(offset, whence)
-	}
-	return 0, newENOSYS("Seek not supported", d)
-}
-
-func (d blobWrapper) Close() error {
-	if closer, ok := d.delegate.(io.Closer); ok {
-		return closer.Close()
-	}
-	return nil
-}
-
-func newENOSYS(msg string, who interface{}) *DefaultError {
-	strWho := reflect.TypeOf(who).String()
-	if str, ok := who.(string); ok {
-		strWho = str
-	}
-	return &DefaultError{msg + ": " + strWho, ENOSYS, nil, nil}
-}

@@ -100,7 +100,7 @@ func ReadBucket(path string) ([]Entry, error) {
 
 }
 
-// ReadBucketRecur fully reads the given directory recursively and returns entries with full qualified paths.
+// ReadBucketRecur fully reads the given directory recursively and returns Entries with full qualified paths.
 func ReadBucketRecur(path string) ([]*PathEntry, error) {
 	res := make([]*PathEntry, 0)
 	err := Walk(path, func(path string, info Entry, err error) error {
@@ -116,7 +116,7 @@ func ReadBucketRecur(path string) ([]*PathEntry, error) {
 	return res, nil
 }
 
-// A WalkClosure is invoked for each entry in Walk, as long as no error is returned and entries are available.
+// A WalkClosure is invoked for each entry in Walk, as long as no error is returned and Entries are available.
 type WalkClosure func(path string, info Entry, err error) error
 
 // Walk recursively goes down the entire path hierarchy starting at the given path
@@ -130,7 +130,7 @@ func Walk(path string, each WalkClosure) error {
 			if IsErr(err, EOF) {
 				return nil
 			}
-			failedEntry := AbsEntry{Id: Path(path).Name()}
+			failedEntry := &DefaultEntry{Id: Path(path).Name()}
 			// let the dev override any error case. If an err is turned to nil, the Walk-callee will continue
 			err = each(Path(path).Child(failedEntry.Name()).String(), failedEntry, err)
 			return err

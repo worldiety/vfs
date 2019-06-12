@@ -76,10 +76,10 @@ func (p *MountableFileSystem) unwrapHandle(handle int) wrappedHandle {
 	return p.handles[handle]
 }
 
-func (p *MountableFileSystem) Connect(ctx context.Context, path string, options interface{}) error {
+func (p *MountableFileSystem) Connect(ctx context.Context, path string, options interface{}) (interface{}, error) {
 	_, providerPath, dp, err := p.Resolve(path)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	return dp.Connect(ctx, providerPath, options)
 }

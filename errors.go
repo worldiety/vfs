@@ -46,7 +46,7 @@ const (
 	//
 	// A resource like a folder or file may get removed at any time. Certain non-cached operations will therefore fail.
 	//
-	// The details contain a []string array which includes all affected path entries.
+	// The details contain a []string array which includes all affected path Entries.
 	ENOENT = 2
 
 	// No such process
@@ -84,7 +84,7 @@ const (
 	// Indicates that a resource has been closed but accessed or that an open mode (e.g. read) does not match an
 	// operation (e.g. write)
 	//
-	// The details contain a []string array which includes all affected path entries.
+	// The details contain a []string array which includes all affected path Entries.
 	EBADF = 9
 
 	// No child processes
@@ -119,7 +119,7 @@ const (
 	//    * A local filesystem has usually system files, which cannot be read or write
 	//    * A remote filesystem has usually provides folders or files which are read only
 	//
-	// The details contain a []string array which includes all affected path entries.
+	// The details contain a []string array which includes all affected path Entries.
 	EACCES = 13
 
 	// Block device required
@@ -134,14 +134,14 @@ const (
 	// A resource is accessed which cannot be shared (or has to many shares) and the operation cannot succeed.
 	// This usually happens also to regular filesystems when deleting a parent folder but you continue using a child.
 	//
-	// The details contain a []string array which includes all affected path entries.
+	// The details contain a []string array which includes all affected path Entries.
 	EBUSY = 16
 
 	// File exists
 	//
 	// An operation expected that it has to create a new file and that it is definitely an error that it already exists.
 	//
-	// The details contain a []string array which includes all affected path entries.
+	// The details contain a []string array which includes all affected path Entries.
 	EEXIST = 17
 
 	// Cross-device link
@@ -149,7 +149,7 @@ const (
 	// This is usually used in two situation: A local file system with different mount points and creating links
 	// between file systems or doing the same across vfs mounted filesystems.
 	//
-	// The details contain a []string array which includes all affected path entries.
+	// The details contain a []string array which includes all affected path Entries.
 	EXDEV = 18
 
 	// No such device
@@ -163,14 +163,14 @@ const (
 	//
 	// An operation was requested which required a directory but found that it's not.
 	//
-	// The details contain a []string array which includes all affected path entries.
+	// The details contain a []string array which includes all affected path Entries.
 	ENOTDIR = 20
 
 	// Is a directory
 	//
 	// An operation was requested which required a file but found that it's a directory.
 	//
-	// The details contain a []string array which includes all affected path entries.
+	// The details contain a []string array which includes all affected path Entries.
 	EISDIR = 21
 
 	// Invalid argument
@@ -184,14 +184,14 @@ const (
 	//
 	// The resources of the entire system to keep files open, are depleted. See also EMFILE, which is more common.
 	//
-	// The details contain a []string array which includes all affected path entries.
+	// The details contain a []string array which includes all affected path Entries.
 	ENFILE = 23
 
 	// Too many open files
 	//
 	// The configured limit of your process or filesystem has been reached. See also ENFILE.
 	//
-	// The details contain a []string array which includes all affected path entries.
+	// The details contain a []string array which includes all affected path Entries.
 	EMFILE = 24
 
 	// File too large
@@ -226,7 +226,7 @@ const (
 	//
 	// The identifier for a file, directory, hostname or similar is too long.
 	//
-	// The details contain a []string array which includes all affected path entries.
+	// The details contain a []string array which includes all affected path Entries.
 	ENAMETOOLONG = 36
 
 	// No record locks available
@@ -304,7 +304,7 @@ const (
 	// There are several operations, especially for creating resources or renaming them which may fail due to uniqueness
 	// constraints.
 	//
-	// The details contain a []string array which includes all affected path entries.
+	// The details contain a []string array which includes all affected path Entries.
 	ENOTUNIQ = 76
 
 	// Illegal byte sequence
@@ -441,7 +441,7 @@ const (
 	//
 	// This error is returned as soon as the underlying iterator has been invalidated, which means that it has been
 	// corrupted and can no longer be used. Iterators without snapshot support have to detect situations where the
-	// consistency of already returned entries is violated, however in such cases you may try to revalidate it to
+	// consistency of already returned Entries is violated, however in such cases you may try to revalidate it to
 	// get a new instance (not specified). Once EITINVALID has been returned, the iterator cannot be used
 	// anymore. It signals an unfixable error which cannot be resolved by repetition.
 	// Example situations:
@@ -481,7 +481,7 @@ const (
 	// A MountPointNotFoundError is only used by the MountableFileSystem to indicate that the given path cannot be
 	// associated with a mounted FileSystem. Check your prefix.
 	//
-	// The details contain a []string array which includes all affected path entries.
+	// The details contain a []string array which includes all affected path Entries.
 	ENOMP = 253
 
 	// Unsupported attributes
