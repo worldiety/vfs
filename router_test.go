@@ -1,19 +1,22 @@
 package vfs
 
-import "testing"
+import (
+	"context"
+	"testing"
+)
 
 func TestRouter_Dispatch(t *testing.T) {
 	router := &Router{}
 
-	router.Handle("/a/b/c", func(ctx RoutingContext) (interface{}, error) {
+	router.Match("/a/b/c", func(ctx RoutingContext) (interface{}, error) {
 		return "1", nil
 	})
 
-	router.Handle("/a/{id}/c", func(ctx RoutingContext) (interface{}, error) {
+	router.Match("/a/{id}/c", func(ctx RoutingContext) (interface{}, error) {
 		return "2", nil
 	})
 
-	router.Handle("/a/{id}/c/{other}", func(ctx RoutingContext) (interface{}, error) {
+	router.Match("/a/{id}/c/{other}", func(ctx RoutingContext) (interface{}, error) {
 
 		if ctx.ValueOf("id") != "x" {
 			t.Fatal("got", ctx.ValueOf("id"))
@@ -25,7 +28,7 @@ func TestRouter_Dispatch(t *testing.T) {
 		return "4", nil
 	})
 
-	router.Handle("*", func(ctx RoutingContext) (interface{}, error) {
+	router.Match("*", func(ctx RoutingContext) (interface{}, error) {
 		return "3", nil
 	})
 
@@ -42,7 +45,7 @@ func TestRouter_Dispatch(t *testing.T) {
 
 func assertState(t *testing.T, router *Router, path Path, expect string) {
 	t.Helper()
-	res, err := router.Dispatch(path)
+	res, err := router.Dispatch(context.Background(), path)
 	if err != nil {
 		t.Fatal(err)
 	}

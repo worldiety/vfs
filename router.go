@@ -1,6 +1,7 @@
 package vfs
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"strings"
@@ -16,6 +17,9 @@ type RoutingContext interface {
 
 	// Args may contains additional arguments passed by invocation/dispatching
 	Args() []interface{}
+
+	// Context returns the golang execution context
+	Context() context.Context
 }
 
 // A Router has a set of patterns which can be registered to be matched in the order of configuration.
@@ -25,9 +29,9 @@ type Router struct {
 
 // Dispatch tries to find the correct matcher for the given path. The first matching callback is invoked or if
 // nothing matches, nothing is called at all (and false is returned). Returns io.EOF if no matcher can be applied.
-func (r *Router) Dispatch(path Path, args ...interface{}) (interface{}, error) {
+func (r *Router) Dispatch(ctx context.Context, path Path, args ...interface{}) (interface{}, error) {
 	for _, m := range r.matchers {
-		matcher, err := m.apply(path)
+		matcher, err := m.apply(ctx, path)
 		if err != nil {
 			continue
 		}
@@ -37,9 +41,9 @@ func (r *Router) Dispatch(path Path, args ...interface{}) (interface{}, error) {
 	return nil, io.EOF
 }
 
-// DispatchReadBucket is required to workaround missing generics
-func (r *Router) DispatchReadBucket(path Path) (ResultSet, error) {
-	res, err := r.Dispatch(path)
+// DispatchResultSet is required to workaround missing generics
+func (r *Router) DispatchResultSet(ctx context.Context, path Path) (ResultSet, error) {
+	res, err := r.Dispatch(ctx, path)
 	if res == nil {
 		return nil, err
 	}
@@ -49,9 +53,9 @@ func (r *Router) DispatchReadBucket(path Path) (ResultSet, error) {
 	return nil, fmt.Errorf("cannot convert result: %v", err)
 }
 
-// DispatchOpen is required to workaround missing generics
-func (r *Router) DispatchOpen(path Path) (Blob, error) {
-	res, err := r.Dispatch(path)
+// DispatchBlob is required to workaround missing generics
+func (r *Router) DispatchBlob(ctx context.Context, path Path) (Blob, error) {
+	res, err := r.Dispatch(ctx, path)
 	if res == nil {
 		return nil, err
 	}
@@ -61,27 +65,46 @@ func (r *Router) DispatchOpen(path Path) (Blob, error) {
 	return nil, fmt.Errorf("cannot convert result: %v", err)
 }
 
-// Handle registers an arbitrary function with a pattern with injection-like semantics.
+// DispatchEntry is required to workaround missing generics
+func (r *Router) DispatchEntry(ctx context.Context, path Path, args ...interface{}) (Entry, error) {
+	res, err := r.Dispatch(ctx, path, args...)
+	if res == nil {
+		return nil, err
+	}
+	if rs, ok := res.(Entry); ok {
+		return rs, err
+	}
+	return nil, fmt.Errorf("cannot convert result: %v", err)
+}
+
+// Match registers an arbitrary function with a pattern with injection-like semantics.
 //
 // Supported patterns are:
 //  * * : matches everything
 //  * /a/concrete/path : matches the exact path
 //  * /{name} : matches anything like /a or /b
 //  * /fix/{var}/fix : matches anything like /fix/a/fix or /fix/b/fix
-func (r *Router) Handle(pattern string, callback func(ctx RoutingContext) (interface{}, error)) {
-	r.matchers = append(r.matchers, matcher{pattern, "", callback, nil})
+func (r *Router) Match(pattern string, callback func(ctx RoutingContext) (interface{}, error)) {
+	r.matchers = append(r.matchers, matcher{pattern, "", callback, nil, nil})
 }
 
-// HandleReadBucket is required to workaround missing generics
-func (r *Router) HandleReadBucket(pattern string, f func(ctx RoutingContext) (ResultSet, error)) {
-	r.Handle(pattern, func(ctx RoutingContext) (interface{}, error) {
+// MatchResultSet is required to workaround missing generics
+func (r *Router) MatchResultSet(pattern string, f func(ctx RoutingContext) (ResultSet, error)) {
+	r.Match(pattern, func(ctx RoutingContext) (interface{}, error) {
 		return f(ctx)
 	})
 }
 
-// HandleOpen is required to workaround missing generics
-func (r *Router) HandleOpen(pattern string, f func(ctx RoutingContext) (Blob, error)) {
-	r.Handle(pattern, func(ctx RoutingContext) (interface{}, error) {
+// MatchBlob is required to workaround missing generics
+func (r *Router) MatchBlob(pattern string, f func(ctx RoutingContext) (Blob, error)) {
+	r.Match(pattern, func(ctx RoutingContext) (interface{}, error) {
+		return f(ctx)
+	})
+}
+
+// MatchEntry is required to workaround missing generics
+func (r *Router) MatchEntry(pattern string, f func(ctx RoutingContext) (Entry, error)) {
+	r.Match(pattern, func(ctx RoutingContext) (i interface{}, e error) {
 		return f(ctx)
 	})
 }
@@ -91,6 +114,7 @@ type matcher struct {
 	path     Path
 	callback func(ctx RoutingContext) (interface{}, error)
 	args     []interface{}
+	ctx      context.Context
 }
 
 func (c matcher) ValueOf(name string) string {
@@ -117,15 +141,15 @@ func (c matcher) Args() []interface{} {
 	return c.args
 }
 
-func (c matcher) apply(path Path, args ...interface{}) (matcher, error) {
+func (c matcher) apply(ctx context.Context, path Path, args ...interface{}) (matcher, error) {
 	if c.pattern == "*" {
-		return c.derive(path), nil
+		return c.derive(ctx, path), nil
 	}
 
 	patternPath := Path(c.pattern)
 
 	if patternPath.Normalize().String() == path.Normalize().String() {
-		return c.derive(path, args...), nil
+		return c.derive(ctx, path, args...), nil
 	}
 
 	patternSegments := patternPath.Names()
@@ -142,13 +166,17 @@ func (c matcher) apply(path Path, args ...interface{}) (matcher, error) {
 				return c, fmt.Errorf("cannot match path")
 			}
 		}
-		return c.derive(path, args...), nil
+		return c.derive(ctx, path, args...), nil
 	}
 
 	return c, fmt.Errorf("cannot match path")
 
 }
 
-func (c matcher) derive(path Path, args ...interface{}) matcher {
-	return matcher{c.pattern, path, c.callback, args}
+func (c matcher) Context() context.Context {
+	return c.ctx
+}
+
+func (c matcher) derive(ctx context.Context, path Path, args ...interface{}) matcher {
+	return matcher{c.pattern, path, c.callback, args, ctx}
 }
