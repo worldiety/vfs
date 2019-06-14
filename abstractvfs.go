@@ -253,10 +253,10 @@ func (r *DefaultResultSet) ReadAttrs(idx int, args interface{}) Entry {
 	switch t := args.(type) {
 	case map[string]interface{}:
 		t[mapEntryName] = entry.Id
-		t[mapEntrySize] = entry.Size
+		t[mapEntrySize] = entry.Size()
 		t[mapEntryIsDir] = entry.IsBucket
 		t[mapEntrySys] = entry.Data
-		return AbsMapEntry(t)
+		return entry
 	case *DefaultEntry:
 		t.Id = entry.Id
 		t.Length = entry.Length

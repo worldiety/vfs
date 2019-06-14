@@ -340,7 +340,7 @@ func (b *Builder) ReadEntryAttrs(f func(ctx context.Context, path Path, dst *Def
 			}
 			t[mapEntryName] = tmp.Id
 			t[mapEntryIsDir] = tmp.IsBucket
-			t[mapEntrySize] = tmp.Size
+			t[mapEntrySize] = tmp.Size()
 			t[mapEntrySys] = tmp.Data
 			return AbsMapEntry(t), nil
 		default:
@@ -492,6 +492,7 @@ func (p *pathMatcher) isMatching(path Path) bool {
 	return false
 }
 
+// deprecated
 type AbsMapEntry map[string]interface{}
 
 func (a AbsMapEntry) Name() string {
