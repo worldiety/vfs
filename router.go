@@ -2,15 +2,20 @@ package vfs
 
 import (
 	"fmt"
+	"io"
 	"strings"
 )
 
+// The RoutingContext is used to represent a dispatching context or state.
 type RoutingContext interface {
 	// ValueOf returns the string value of a named parameter or the empty string if undefined
 	ValueOf(name string) string
 
 	// Path returns the actual path
 	Path() Path
+
+	// Args may contains additional arguments passed by invocation/dispatching
+	Args() []interface{}
 }
 
 // A Router has a set of patterns which can be registered to be matched in the order of configuration.
@@ -19,35 +24,59 @@ type Router struct {
 }
 
 // Dispatch tries to find the correct matcher for the given path. The first matching callback is invoked or if
-// nothing matches, nothing is called at all (and false is returned).
-func (r *Router) Dispatch(path Path) bool {
+// nothing matches, nothing is called at all (and false is returned). Returns io.EOF if no matcher can be applied.
+func (r *Router) Dispatch(path Path, args ...interface{}) (interface{}, error) {
 	for _, m := range r.matchers {
 		matcher, err := m.apply(path)
 		if err != nil {
 			continue
 		}
 		// invoke, if the pattern matches and return
-		matcher.callback(matcher)
-		return true
+		return matcher.callback(matcher)
 	}
-	return false
+	return nil, io.EOF
+}
+
+// DispatchReadBucket is required to workaround missing generics
+func (r *Router) DispatchReadBucket(path Path, f func(ctx RoutingContext) (ResultSet, error)) (ResultSet, error) {
+	res, err := r.Dispatch(path)
+	if res == nil {
+		return nil, err
+	}
+	if rs, ok := res.(ResultSet); ok {
+		return rs, err
+	}
+	return nil, fmt.Errorf("cannot convert result: %v", err)
+}
+
+// DispatchOpen is required to workaround missing generics
+func (r *Router) DispatchOpen(path Path, f func(ctx RoutingContext) (ResultSet, error)) (Blob, error) {
+	res, err := r.Dispatch(path)
+	if res == nil {
+		return nil, err
+	}
+	if rs, ok := res.(Blob); ok {
+		return rs, err
+	}
+	return nil, fmt.Errorf("cannot convert result: %v", err)
 }
 
 // Handle registers an arbitrary function with a pattern with injection-like semantics.
 //
 // Supported patterns are:
-//  * / : matches everything
+//  * * : matches everything
 //  * /a/concrete/path : matches the exact path
 //  * /{name} : matches anything like /a or /b
 //  * /fix/{var}/fix : matches anything like /fix/a/fix or /fix/b/fix
-func (r *Router) Handle(pattern string, callback func(ctx RoutingContext)) {
-	r.matchers = append(r.matchers, matcher{pattern, "", callback})
+func (r *Router) Handle(pattern string, callback func(ctx RoutingContext) (interface{}, error)) {
+	r.matchers = append(r.matchers, matcher{pattern, "", callback, nil})
 }
 
 type matcher struct {
 	pattern  string
 	path     Path
-	callback func(ctx RoutingContext)
+	callback func(ctx RoutingContext) (interface{}, error)
+	args     []interface{}
 }
 
 func (c matcher) ValueOf(name string) string {
@@ -70,15 +99,19 @@ func (c matcher) Path() Path {
 	return c.path
 }
 
-func (c matcher) apply(path Path) (matcher, error) {
-	if c.pattern == "/" {
+func (c matcher) Args() []interface{} {
+	return c.args
+}
+
+func (c matcher) apply(path Path, args ...interface{}) (matcher, error) {
+	if c.pattern == "*" {
 		return c.derive(path), nil
 	}
 
 	patternPath := Path(c.pattern)
 
 	if patternPath.Normalize().String() == path.Normalize().String() {
-		return c.derive(path), nil
+		return c.derive(path, args...), nil
 	}
 
 	patternSegments := patternPath.Names()
@@ -95,13 +128,13 @@ func (c matcher) apply(path Path) (matcher, error) {
 				return c, fmt.Errorf("cannot match path")
 			}
 		}
-		return c.derive(path), nil
+		return c.derive(path, args...), nil
 	}
 
 	return c, fmt.Errorf("cannot match path")
 
 }
 
-func (c matcher) derive(path Path) matcher {
-	return matcher{c.pattern, path, c.callback}
+func (c matcher) derive(path Path, args ...interface{}) matcher {
+	return matcher{c.pattern, path, c.callback, args}
 }
