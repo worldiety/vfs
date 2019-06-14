@@ -38,7 +38,7 @@ func (r *Router) Dispatch(path Path, args ...interface{}) (interface{}, error) {
 }
 
 // DispatchReadBucket is required to workaround missing generics
-func (r *Router) DispatchReadBucket(path Path, f func(ctx RoutingContext) (ResultSet, error)) (ResultSet, error) {
+func (r *Router) DispatchReadBucket(path Path) (ResultSet, error) {
 	res, err := r.Dispatch(path)
 	if res == nil {
 		return nil, err
@@ -50,7 +50,7 @@ func (r *Router) DispatchReadBucket(path Path, f func(ctx RoutingContext) (Resul
 }
 
 // DispatchOpen is required to workaround missing generics
-func (r *Router) DispatchOpen(path Path, f func(ctx RoutingContext) (ResultSet, error)) (Blob, error) {
+func (r *Router) DispatchOpen(path Path) (Blob, error) {
 	res, err := r.Dispatch(path)
 	if res == nil {
 		return nil, err
@@ -70,6 +70,20 @@ func (r *Router) DispatchOpen(path Path, f func(ctx RoutingContext) (ResultSet, 
 //  * /fix/{var}/fix : matches anything like /fix/a/fix or /fix/b/fix
 func (r *Router) Handle(pattern string, callback func(ctx RoutingContext) (interface{}, error)) {
 	r.matchers = append(r.matchers, matcher{pattern, "", callback, nil})
+}
+
+// HandleReadBucket is required to workaround missing generics
+func (r *Router) HandleReadBucket(pattern string, f func(ctx RoutingContext) (ResultSet, error)) {
+	r.Handle(pattern, func(ctx RoutingContext) (interface{}, error) {
+		return f(ctx)
+	})
+}
+
+// HandleOpen is required to workaround missing generics
+func (r *Router) HandleOpen(pattern string, f func(ctx RoutingContext) (Blob, error)) {
+	r.Handle(pattern, func(ctx RoutingContext) (interface{}, error) {
+		return f(ctx)
+	})
 }
 
 type matcher struct {
