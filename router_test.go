@@ -12,6 +12,10 @@ func TestRouter_Dispatch(t *testing.T) {
 		return "1", nil
 	})
 
+	router.Match("/a/c/*", func(ctx RoutingContext) (i interface{}, e error) {
+		return "5", nil
+	})
+
 	router.Match("/a/{id}/c", func(ctx RoutingContext) (interface{}, error) {
 		return "2", nil
 	})
@@ -41,6 +45,10 @@ func TestRouter_Dispatch(t *testing.T) {
 	assertState(t, router, "/a/x/c/", "2")
 
 	assertState(t, router, "/a/x/c/z", "4")
+	assertState(t, router, "/a/c/e", "5")
+	assertState(t, router, "/a/c/e/f/g/h", "5")
+	assertState(t, router, "/a/c/", "5")
+	assertState(t, router, "/a/c", "5")
 }
 
 func assertState(t *testing.T, router *Router, path Path, expect string) {

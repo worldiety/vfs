@@ -84,6 +84,7 @@ func (r *Router) DispatchEntry(ctx context.Context, path Path, args ...interface
 //  * /a/concrete/path : matches the exact path
 //  * /{name} : matches anything like /a or /b
 //  * /fix/{var}/fix : matches anything like /fix/a/fix or /fix/b/fix
+//  * /fix/fix2/* : matches anything like /fix/fix2 or /fix/fix2/a/b/
 func (r *Router) Match(pattern string, callback func(ctx RoutingContext) (interface{}, error)) {
 	r.matchers = append(r.matchers, matcher{pattern, "", callback, nil, nil})
 }
@@ -129,8 +130,12 @@ func (c matcher) ValueOf(name string) string {
 	if idxOfName < 0 {
 		return ""
 	}
-	// this will cause out of bounds panic, if our matching fails
-	return c.path.NameAt(idxOfName)
+	// there could be out of bounds failure, which we silently ignore
+	pathNames := c.path.Names()
+	if idxOfName >= len(pathNames) {
+		return ""
+	}
+	return pathNames[idxOfName]
 }
 
 func (c matcher) Path() Path {
@@ -157,6 +162,10 @@ func (c matcher) apply(ctx context.Context, path Path, args ...interface{}) (mat
 
 	if len(pathSegments) == len(patternSegments) {
 		for i, p := range patternSegments {
+			isWildcard := p == "*"
+			if isWildcard {
+				break
+			}
 			isNamedVar := strings.HasPrefix(p, "{") && strings.HasSuffix(p, "}")
 			if isNamedVar {
 				// a named path segment is ignored
@@ -166,6 +175,10 @@ func (c matcher) apply(ctx context.Context, path Path, args ...interface{}) (mat
 				return c, fmt.Errorf("cannot match path")
 			}
 		}
+		return c.derive(ctx, path, args...), nil
+	}
+
+	if len(patternSegments) > 0 && patternSegments[len(patternSegments)-1] == "*" && strings.HasPrefix(path.String(), patternPath.Parent().String()) {
 		return c.derive(ctx, path, args...), nil
 	}
 
