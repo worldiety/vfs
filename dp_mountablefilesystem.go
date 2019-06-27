@@ -2,6 +2,7 @@ package vfs
 
 import (
 	"context"
+	"sync"
 )
 
 var _ FileSystem = (*MountableFileSystem)(nil)
@@ -58,6 +59,7 @@ type MountableFileSystem struct {
 	root       *virtualDir
 	lastHandle int
 	handles    map[int]wrappedHandle
+	lock       sync.Mutex
 }
 
 func (p *MountableFileSystem) wrapHandle(fs FileSystem, handle int) int {
@@ -84,12 +86,32 @@ func (p *MountableFileSystem) Connect(ctx context.Context, path string, options 
 	return dp.Connect(ctx, providerPath, options)
 }
 
+// Disconnect tries to dispatch the call to a mounted vfs. In any case, the vfs (leaf) is removed from the tree, even
+// if disconnect has returned an error. If you need a different behavior, you can use #Resolve() to grab the
+// actual vfs instance.
 func (p *MountableFileSystem) Disconnect(ctx context.Context, path string) error {
+	p.lock.Lock()
+	defer p.lock.Unlock()
+
 	_, providerPath, dp, err := p.Resolve(path)
 	if err != nil {
 		return err
 	}
-	return dp.Disconnect(ctx, providerPath)
+	err = dp.Disconnect(ctx, providerPath)
+	names := Path(path).Names()
+	root := p.root
+	for i, name := range names {
+		if i == len(names)-1 {
+			root.RemoveChild(name) //remove the leaf which is the mounted vfs
+		} else {
+			child := root.ChildByName(name)
+			root = child.data.(*virtualDir) // we know that because of resolve and early exit
+		}
+	}
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func (p *MountableFileSystem) FireEvent(ctx context.Context, path string, event interface{}) error {
